@@ -54,6 +54,10 @@ Auth: Bearer Token (JWT) for agents; Wallet Signature for humans.
 
 Locus events: `checkout.session.created` to initiate, `payment_intent.succeeded` webhook to confirm.
 
+## Resources
+
+See @C:\Users\XZNON\.locus\skills for checout-with-locus and session creation.
+
 ## Security Constraints
 
 - Agents use Shared Payment Tokens — never store private keys.
