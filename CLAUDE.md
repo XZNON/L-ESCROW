@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project: L-ESCROW
 
-A decentralized RFP (Request for Proposal) engine enabling Agent-to-Agent (A2A) price negotiation and automated escrow settlement. AI agents bid on tasks; funds are locked via Locus SDK (USDC on Base) and released only when an independent Assessor Agent programmatically verifies the work.
+A decentralized RFP (Request for Proposal) engine enabling Agent-to-Agent (A2A) price negotiation and automated escrow settlement. AI agents bid on tasks; funds are locked via Locus Checkout (USDC on Base) and released only when an independent Assessor Agent programmatically verifies the work.
 
 ## Tech Stack
 
 - **Frontend**: Jinja2 server-side templates + Tailwind CSS CDN (MVP); React planned for later phases
-- **Backend**: FastAPI (Python) — `backend/app.py` is the app entry point
+- **Backend**: FastAPI (Python) — `backend/app.py` is the single app entry point
 - **AI Agents**: LangGraph (planned) for multi-agent coordination
 - **Payments**: Locus SDK — REST API at `https://beta-api.paywithlocus.com/api`, auth via `Bearer claw_…` key
 - **Database**: SQLite (`lescrow.db`, no ORM) for MVP
@@ -18,22 +18,22 @@ A decentralized RFP (Request for Proposal) engine enabling Agent-to-Agent (A2A) 
 ## Architecture
 
 ```
-[ React Frontend ] <--> [ Marketplace Hub (FastAPI) ]
-      |                         ^             ^
-      v                         |             |
-[ Locus SDK/Web ] <-----------> [ Agent Squad ]
-      |                         | (Strategist, Seller, Assessor)
-      v                         v
-[ Base Blockchain ] <-----> [ External Tools/APIs ]
+[ Jinja2 Frontend ] <--> [ Marketplace Hub (FastAPI) ]
+                                  ^             ^
+                                  |             |
+[ Locus Checkout ] <-----------> [ Agent Squad ]
+      |                           | (Buyer, Seller, Assessor)
+      v                           v
+[ Base Blockchain ]          [ SQLite DB ]
 ```
 
-**Core flow**: Human sets budget → Buyer Agent posts RFP → Seller Agent bids → Locus locks USDC in escrow → Seller delivers work → Assessor Agent verifies → Locus releases funds (or refunds on failure).
+**Core flow**: Human sets budget mandate → Buyer Agent posts RFP → Seller Agent bids → Locus Checkout locks USDC → Seller delivers work → Assessor Agent verifies → Locus releases funds (or refunds on failure).
 
 ## Agent Roles
 
-- **Strategist Agent**: Decomposes human goals using Chain-of-Thought; queries historical price DB to cap bids; uses smaller models (Llama 3 8B).
-- **Seller Agent**: Scans Hub for RFPs, calculates cost + margin, submits bids.
-- **Assessor Agent**: Sandboxed; no spending power, only webhook signing power to trigger PASS/FAIL. Uses GPT-4o or Claude for high-value verification. Randomly rotated to prevent collusion.
+- **Buyer Agent**: Posts RFPs with task spec, max budget, deadline, and reputation requirements.
+- **Seller Agent**: Scans Hub for Open RFPs, calculates cost + margin, submits bids via `POST /api/v1/bid`.
+- **Assessor Agent**: Sandboxed verifier with no spending power — only submits PASS/FAIL verdicts. Triggers fund release or refund. Randomly rotated to prevent collusion.
 
 ## Development Commands
 
@@ -51,85 +51,106 @@ uvicorn backend.app:app --reload
 
 ```
 backend/
-├── app.py              # FastAPI app — all routes registered here
-├── database/db.py      # SQLite helpers: init_db, get_owner, update_mandate, get_policy, update_policy
-├── templates/          # Jinja2 templates (all extend base.html)
-│   ├── base.html
-│   ├── dashboard.html
-│   └── settings.html
+├── app.py                        # FastAPI app — all routes
+├── database/
+│   └── db.py                     # All SQLite helpers
+├── templates/                    # Jinja2 templates (all extend base.html)
+│   ├── base.html                 # Nav: Dashboard | Marketplace | Settings
+│   ├── dashboard.html            # Command center — wallet status + pacts feed
+│   ├── settings.html             # Mandate config form (buyer + merchant keys)
+│   └── marketplace.html          # Live bulletin board — RFP cards + bid tables
 └── static/
     ├── css/dashboard.css         # CSS custom properties for escrow status colors
-    └── js/locus-integration.js   # fetch wrappers: submitMandate, refreshBalance
-lescrow.db              # SQLite DB (auto-created on first run)
+    └── js/locus-integration.js   # fetch wrappers + auto-refresh polling
+lescrow.db                        # SQLite DB (auto-created on first run)
 requirements.txt
 ```
 
 ## Database Rules
 
-- **No ORM** — use raw `sqlite3` with `?` parameterized queries only.
-- Single-row pattern: `owner` and `agent_policies` tables always use `id = 1`.
+- **No ORM** — raw `sqlite3` with `?` parameterized queries only.
+- Single-row pattern: `owner` and `agent_policies` always use `id = 1`.
 - All DB functions live in `backend/database/db.py`.
+- Migrations via `try/except ALTER TABLE` in `init_db()` for existing databases.
 
 ## Implemented API Endpoints
 
-- `GET /` — Dashboard (wallet status, balance, pacts feed)
-- `GET /settings` — Mandate configuration form
-- `POST /api/v1/mandate` — Validates Locus API key against `/pay/balance`, then persists token + policy
-- `GET /api/v1/balance` — Proxies balance from Locus API using stored token
+### Human / UI routes
+- `GET /` — Dashboard: wallet status card, balance, active pacts feed
+- `GET /settings` — Mandate form: buyer key, merchant key, max budget, daily limit, min assessor score
+- `GET /marketplace` — Live bulletin board with all RFPs and their bids
 
-## Marketplace Hub Frontend
+### Agent API routes
+- `POST /api/v1/mandate` — Validates both Locus keys against `/pay/balance`, persists tokens + policy
+- `GET /api/v1/balance` — Proxies buyer balance from Locus API using stored token
+- `POST /api/v1/rfp` — Create a new RFP (Open status)
+- `POST /api/v1/bid` — Submit a bid; auto-triggers Locus Checkout if bid is within budget
+- `GET /api/v1/rfps` — List all RFPs, optional `?status=Open` filter
+- `GET /api/v1/rfps/{rfp_id}/bids` — List all bids for a specific RFP
 
-- **Route**: `GET /marketplace` — A live view of the "Bulletin Board."
-- **Function**: Displays `Open` RFPs and active `Bids`.
-- **Visuals**: High-contrast status badges: `Bidding`, `Escrow Locked`, `Verifying`, `Settled`.
+### Utility routes
+- `GET /api/v1/debug/payment/{transaction_id}` — Inspect a Locus transaction (dev only)
+- `POST /api/v1/webhook/locus` — Locus webhook receiver; HMAC-SHA256 verified; handles `checkout.session.paid`
 
-**Planned endpoints** (not yet built):
+### Not yet built
+- `POST /api/v1/verify` — Assessor submits PASS/FAIL; triggers fund release or refund
 
-Auth: Bearer Token (JWT) for agents; Wallet Signature for humans.
+## Locus Checkout Integration (Implemented)
 
-- `POST /api/v1/rfp` — Buyer posts a task with `task_spec`, `max_budget`, `deadline_seconds`, `min_reputation`, `verification_type`
-- `POST /api/v1/bid` — Seller bids on an RFP with `rfp_id`, `bid_amount`, `eta_seconds`
-- `POST /api/v1/verify` — Assessor submits PASS/FAIL; Hub triggers Locus capture or cancellation
+Two separate Locus accounts are required:
+- **Buyer account** (`locus_auth_token`): pays checkout sessions autonomously
+- **Merchant account** (`merchant_locus_token`): creates checkout sessions, receives payment
 
-## Database Schema
+### Bid auto-payment flow (`POST /api/v1/bid`):
+1. Merchant creates checkout session: `POST /api/checkout/sessions` (merchant token)
+2. Extract `session_id`, `webhookSecret`, and `checkoutUrl` from response
+3. Mark RFP as `Verifying` in DB (`db.set_rfp_verifying`)
+4. Buyer agent pays session: `POST /checkout/agent/pay/{sessionId}` (buyer token) with `{"payerEmail": seller_email}`
+5. Background task polls `GET /checkout/sessions/{sessionId}` (merchant token) every 2s up to 60s
+6. On `PAID` → `db.accept_bid()` locks RFP atomically
+7. On `EXPIRED`/`CANCELLED` or timeout → `db.revert_rfp_to_open()` rolls back
 
-**`owner`** (single row, id=1): `locus_auth_token` (Text), `max_task_budget` (Real), `daily_limit` (Real)
-
-**`agent_policies`** (single row, id=1): `required_assessor_score` (Real), `allowed_service_types` (JSON text)
-
-**Planned tables:**
-
-**`agents`**: `id` (UUID), `wallet_address`, `reputation_score`, `type` (Buyer/Seller/Assessor)
-
-**`pacts`** (the RFP record): `id`, `buyer_id`, `seller_id`, `status` (Open → Locked → Completed/Disputed), `escrow_session_id` (Locus ID), `task_payload` (JSON)
-
-**`bids`**: `id` (UUID), `rfp_id` (FK), `seller_id` (UUID), `amount` (Real), `eta` (Integer), `status` (Pending/Accepted/Rejected)
-
-## Payment State Machine
-
-`PAYMENT_PENDING` (bid accepted, Locus session created) → Assessor verifies → `SUCCESS` (funds released to Seller) or `FAIL` (Locus session cancelled, funds refunded to Buyer).
-
-Locus events: `checkout.session.created` to initiate, `payment_intent.succeeded` webhook to confirm.
-
-## Locus SDK Integration
-
+### Key Locus API facts:
 - **API base**: `https://beta-api.paywithlocus.com/api`
-- **Auth**: `Authorization: Bearer <claw_…key>` on every request
-- **Balance**: `GET /pay/balance` → `{data: {balance, wallet_address}}`
-- **Checkout session payment**: `POST /checkout/agent/pay/:sessionId`; poll `GET /checkout/agent/payments/:transactionId` every 2s
-- **Webhook event**: `checkout.session.paid` — verify with HMAC-SHA256 using `webhookSecret`
-- **Policy errors**: `403` = limit exceeded; `202` = pending human approval (includes `approval_url`)
-- Full SDK docs: `C:\Users\XZNON\.locus\skills`
+- **Checkout URL**: extract `checkoutUrl` from session creation response — do NOT construct manually
+- **Poll for payment confirmation**: `GET /api/checkout/sessions/{sessionId}` — check `data.status == "PAID"`
+- **Do NOT use** `GET /checkout/agent/payments/{transactionId}` — returns 403 for cross-account transactions
+- **Webhook verification**: HMAC-SHA256 with `webhookSecret` from session creation; header `X-Signature-256`
+- **Webhook event**: `checkout.session.paid` — `X-Webhook-Event` header; `X-Session-Id` header for lookup
+
+## RFP Status Lifecycle
+
+```
+Open → Verifying → Locked → Completed
+                ↘          ↘
+              Open (rollback)  Disputed
+```
+
+- `Open`: accepting bids
+- `Verifying`: checkout session created, payment in flight (purple badge)
+- `Locked`: payment confirmed, work in progress (amber badge)
+- `Completed`: Assessor PASS, funds released (green badge) — **not yet implemented**
+- `Disputed`: Assessor FAIL, funds refunded (red badge) — **not yet implemented**
+
+## CSS Status Classes
+
+Status badges use `badge-{status|lower}` class. Colors defined as CSS custom properties in `dashboard.css`:
+```css
+--color-escrow-open:       #3b82f6  (blue)
+--color-escrow-verifying:  #8b5cf6  (purple)
+--color-escrow-locked:     #f59e0b  (amber)
+--color-escrow-completed:  #10b981  (green)
+--color-escrow-disputed:   #ef4444  (red)
+```
 
 ## Security Constraints
 
 - Agents use Shared Payment Tokens — never store private keys.
-- Sellers must stake a small USDC amount to bid (Sybil resistance).
-- Funds move Buyer → Smart Contract → Seller; L-ESCROW never holds keys (non-custodial).
-- High-value tasks use multi-model consensus for Assessor verification.
+- Funds move Buyer → Locus Checkout → Seller; L-ESCROW never holds keys.
+- High-value tasks should use multi-model consensus for Assessor verification.
 
 ## Success Criteria (MVP)
 
-- Request-to-Payout under 60 seconds.
+- Request-to-Payout under 60 seconds (current polling window: 60s max).
 - Automated refund on Assessor rejection.
 - Average transaction fee < $0.05 (excluding agent compute).

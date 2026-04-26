@@ -42,6 +42,7 @@ async function submitMandate(event) {
 
   const payload = {
     locus_auth_token: form.locus_auth_token.value.trim(),
+    merchant_locus_token: form.merchant_locus_token.value.trim(),
     max_task_budget: parseFloat(form.max_task_budget.value),
     daily_limit: parseFloat(form.daily_limit.value),
     required_assessor_score: parseFloat(form.required_assessor_score.value),
@@ -67,6 +68,12 @@ async function submitMandate(event) {
   }
 }
 
+function pollMarketplace() {
+  if (document.querySelector("[data-refresh]")) {
+    location.reload();
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const mandateForm = document.getElementById("mandate-form");
   if (mandateForm) mandateForm.addEventListener("submit", submitMandate);
@@ -74,5 +81,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (document.getElementById("balance-display")) {
     refreshBalance();
     setInterval(refreshBalance, 30000);
+  }
+
+  if (document.querySelector("[data-refresh]")) {
+    setInterval(pollMarketplace, 10000);
   }
 });

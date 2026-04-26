@@ -1,0 +1,1125 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.paywithlocus.com/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Checkout with Locus
+
+> Accept USDC payments with a drop-in checkout experience
+
+Checkout with Locus lets you accept USDC payments on Base through a hosted checkout page. Embed it in your app with `@withlocus/checkout-react`, and Locus handles wallet connections, payment confirmation, and webhooks.
+
+AI agents can already build sites and deploy products. With Locus Checkout, they can also get paid. An agent can create an account, integrate checkout, and start collecting revenue entirely through SDKs, in minutes not weeks. And because the checkout page is machine-readable by design, agents on the other side can discover and complete payments just as easily. One integration that works for humans and agents, as both buyers and sellers.
+
+## How it works
+
+<Steps>
+  <Step title="Create a session">
+    A checkout session is created with an amount, description, and optional webhook URL. Locus auto-generates a unique session ID (UUID) and returns a checkout URL.
+  </Step>
+
+  <Step title="Show the checkout">
+    Embed the checkout UI in your app using the `@withlocus/checkout-react` SDK — inline, as a popup, or via redirect to the hosted page.
+  </Step>
+
+  <Step title="Buyer pays">
+    The buyer chooses a payment method and completes the transaction.
+  </Step>
+
+  <Step title="You get notified">
+    Locus confirms the payment on-chain and fires a webhook to your server. The React SDK also calls your `onSuccess` callback.
+  </Step>
+</Steps>
+
+## Payment methods
+
+<CardGroup cols={3}>
+  <Card title="Locus Wallet" icon="bolt">
+    One-click payment for users with a Locus account. No wallet popups, no gas fees.
+  </Card>
+
+  <Card title="External Wallet" icon="wallet">
+    MetaMask, Coinbase Wallet, or any WalletConnect-compatible wallet. Pays via the on-chain [Payment Router](/checkout/payment-router).
+  </Card>
+
+  <Card title="AI Agent" icon="robot">
+    Agents with Locus set up via [SKILL.md](https://paywithlocus.com/skill.md) can create and pay checkout sessions programmatically — no UI needed.
+  </Card>
+</CardGroup>
+
+## Sessions
+
+Every checkout session has an auto-generated UUID as its ID. You don't need to provide one — Locus creates it when the session is created.
+
+### Lifecycle
+
+| Status        | Meaning                                                                            |
+| ------------- | ---------------------------------------------------------------------------------- |
+| **PENDING**   | Session is active and awaiting payment                                             |
+| **PAID**      | Payment confirmed on-chain. `paymentTxHash`, `payerAddress`, and `paidAt` are set. |
+| **EXPIRED**   | No payment received before the session's `expiresAt` timestamp (default: 30 min)   |
+| **CANCELLED** | The seller cancelled the session                                                   |
+
+<Note>
+  Once a session leaves PENDING, it cannot be modified.
+</Note>
+
+## Checkout page
+
+<Frame caption="Checkout page — buyer selects a payment method">
+  <img src="https://mintcdn.com/locus-9b87448d/DguWngOP5xOh0crJ/images/checkout/checkout-page.png?fit=max&auto=format&n=DguWngOP5xOh0crJ&q=85&s=f6bf83c6e0554af4087317ade10b5dc3" alt="Checkout page" style={{ maxWidth: '420px' }} width="878" height="1328" data-path="images/checkout/checkout-page.png" />
+</Frame>
+
+<Frame caption="Payment confirmed — success state">
+  <img src="https://mintcdn.com/locus-9b87448d/DguWngOP5xOh0crJ/images/checkout/checkout-success.png?fit=max&auto=format&n=DguWngOP5xOh0crJ&q=85&s=d12b8b5fd84cac77eb9e6da883509a35" alt="Checkout success" style={{ maxWidth: '420px' }} width="868" height="726" data-path="images/checkout/checkout-success.png" />
+</Frame>
+
+## Merchant dashboard
+
+Merchants manage checkout sessions, view analytics, and track purchases from the [Locus dashboard](https://app.paywithlocus.com).
+
+<Frame caption="Checkout instances — per-integration analytics">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-instances.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=ced6ca818c855b3ef26a360dc23b5965" alt="Checkout instances" width="2708" height="1114" data-path="images/checkout/dashboard-instances.png" />
+</Frame>
+
+<Frame caption="Analytics — revenue, sessions, conversion rate, payment methods">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/analytics-stats.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=69d620f185e154fb6a4805d8f8c7dc1f" alt="Analytics stats" width="2712" height="404" data-path="images/checkout/analytics-stats.png" />
+</Frame>
+
+<Frame caption="Recent sessions — paginated table of all checkout sessions">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/recent-sessions.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=f0340c0a3c45d903522935618bf6ebad" alt="Recent sessions" width="2702" height="1836" data-path="images/checkout/recent-sessions.png" />
+</Frame>
+
+<Frame caption="Purchases — buyer-side view with expandable receipt details">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/purchases-page.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=8e964b84d0818ef143c0951b4a746d52" alt="Purchases page" width="2702" height="1836" data-path="images/checkout/purchases-page.png" />
+</Frame>
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card title="Example Implementations" icon="puzzle-piece" href="/checkout/integrate">
+    Copy-paste examples for session creation and checkout rendering.
+  </Card>
+
+  <Card title="Merchant Integration" icon="code" href="/checkout/for-merchants">
+    Create sessions and embed checkout in your app.
+  </Card>
+
+  <Card title="Buyer & Agent Guide" icon="user" href="/checkout/for-buyers">
+    How buyers and AI agents pay through checkout.
+  </Card>
+</CardGroup>
+
+
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.paywithlocus.com/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Example Implementations
+
+> End-to-end examples for adding Locus Checkout to your app
+
+Full working examples using the Locus SDKs. Copy-paste and adapt.
+
+## Install
+
+```bash theme={null}
+npm install @locus/agent-sdk @withlocus/checkout-react
+```
+
+`@locus/agent-sdk` handles session creation on the server. `@withlocus/checkout-react` renders the checkout UI on the client. Requires React 17+.
+
+## Quick start (without receipt)
+
+### Step 1: Create a session
+
+Use the `@locus/agent-sdk` on your server to create a checkout session.
+
+```typescript theme={null}
+import LocusAgent from '@locus/agent-sdk';
+
+const locus = new LocusAgent({ apiKey: process.env.LOCUS_API_KEY! });
+
+const session = await locus.sessions.create({
+  amount: '25.00',
+  description: 'Pro plan — monthly',
+  successUrl: 'https://yourapp.com/success',
+  cancelUrl: 'https://yourapp.com/cancel',
+  webhookUrl: 'https://yourapp.com/api/webhooks/locus',
+  metadata: { userId: 'usr_123', plan: 'pro' },
+});
+
+// session.id        → session ID (UUID)
+// session.expiresAt → session expiration (default 30 min)
+```
+
+### Step 2: Render checkout
+
+Pass the session ID to the `LocusCheckout` component on the client.
+
+```tsx theme={null}
+import { LocusCheckout } from '@withlocus/checkout-react';
+
+function CheckoutPage({ sessionId }: { sessionId: string }) {
+  return (
+    <LocusCheckout
+      sessionId={sessionId}
+      mode="embedded"
+      onSuccess={(data) => {
+        console.log('Payment confirmed:', data.txHash);
+        window.location.href = '/success';
+      }}
+      onCancel={() => {
+        console.log('Buyer cancelled');
+        window.location.href = '/cancel';
+      }}
+      onError={(error) => {
+        console.error('Checkout error:', error.message);
+      }}
+    />
+  );
+}
+```
+
+### Full example (Next.js)
+
+A complete Next.js flow — API route creates the session, page renders the checkout.
+
+<CodeGroup>
+  ```typescript app/api/checkout/route.ts theme={null}
+  import { NextResponse } from 'next/server';
+  import LocusAgent from '@locus/agent-sdk';
+
+  const locus = new LocusAgent({ apiKey: process.env.LOCUS_API_KEY! });
+
+  export async function POST(req: Request) {
+    const { plan, userId } = await req.json();
+
+    const session = await locus.sessions.create({
+      amount: plan === 'pro' ? '25.00' : '10.00',
+      description: `${plan} plan — monthly`,
+      successUrl: `${process.env.NEXT_PUBLIC_URL}/success`,
+      cancelUrl: `${process.env.NEXT_PUBLIC_URL}/pricing`,
+      webhookUrl: `${process.env.NEXT_PUBLIC_URL}/api/webhooks/locus`,
+      metadata: { userId, plan },
+    });
+
+    return NextResponse.json({ sessionId: session.id });
+  }
+  ```
+
+  ```tsx app/checkout/page.tsx theme={null}
+  'use client';
+
+  import { useSearchParams } from 'next/navigation';
+  import { LocusCheckout } from '@withlocus/checkout-react';
+
+  export default function CheckoutPage() {
+    const sessionId = useSearchParams().get('session');
+
+    if (!sessionId) return <p>Missing session ID.</p>;
+
+    return (
+      <div style={{ maxWidth: 500, margin: '0 auto', padding: '2rem' }}>
+        <LocusCheckout
+          sessionId={sessionId}
+          mode="embedded"
+          onSuccess={(data) => {
+            window.location.href = `/success?tx=${data.txHash}`;
+          }}
+          onCancel={() => {
+            window.location.href = '/pricing';
+          }}
+          onError={(error) => {
+            console.error(error.message);
+          }}
+        />
+      </div>
+    );
+  }
+  ```
+</CodeGroup>
+
+***
+
+## With receipt
+
+Pass `receiptConfig` to `locus.sessions.create()` to attach line items, tax, and company info to the session. The client-side `LocusCheckout` component stays exactly the same — it automatically renders receipt details when the session has them.
+
+### Create a session with receipt
+
+```typescript theme={null}
+import LocusAgent from '@locus/agent-sdk';
+
+const locus = new LocusAgent({ apiKey: process.env.LOCUS_API_KEY! });
+
+const session = await locus.sessions.create({
+  amount: '27.50',
+  description: 'TechMart order #4821',
+  successUrl: 'https://yourapp.com/success',
+  cancelUrl: 'https://yourapp.com/cart',
+  webhookUrl: 'https://yourapp.com/api/webhooks/locus',
+  metadata: { orderId: 'order_4821' },
+  receiptConfig: {
+    enabled: true,
+    fields: {
+      creditorName: 'TechMart Inc.',
+      lineItems: [
+        { description: 'Wireless Headphones', amount: '25.00' },
+        { description: 'Shipping', amount: '0.00' },
+      ],
+      subtotal: '25.00',
+      taxRate: '10%',
+      taxAmount: '2.50',
+      logoUrl: 'https://techmart.com/logo.png',
+      companyAddress: '123 Market St, San Francisco, CA 94105',
+      supportEmail: 'support@techmart.com',
+    },
+  },
+});
+
+// session.id → pass to LocusCheckout on the client
+```
+
+### Render checkout
+
+```tsx theme={null}
+import { LocusCheckout } from '@withlocus/checkout-react';
+
+// Same component — receipt details come from the session, not the client
+function CheckoutPage({ sessionId }: { sessionId: string }) {
+  return (
+    <LocusCheckout
+      sessionId={sessionId}
+      mode="embedded"
+      onSuccess={(data) => {
+        console.log('Paid:', data.txHash);
+        window.location.href = '/success';
+      }}
+      onCancel={() => {
+        window.location.href = '/cart';
+      }}
+    />
+  );
+}
+```
+
+<Info>
+  The `LocusCheckout` component is identical whether the session uses receipts or not. All receipt configuration happens in `locus.sessions.create()`.
+</Info>
+
+### `receiptConfig` fields
+
+| Field                   | Type                                        | Description                              |
+| ----------------------- | ------------------------------------------- | ---------------------------------------- |
+| `enabled`               | `boolean`                                   | Enable the receipt on this session       |
+| `fields.creditorName`   | `string`                                    | Seller/company name shown on the receipt |
+| `fields.lineItems`      | `{ description: string, amount: string }[]` | Itemized charges                         |
+| `fields.subtotal`       | `string`                                    | Subtotal before tax                      |
+| `fields.taxRate`        | `string`                                    | Tax rate (e.g. `"10%"`)                  |
+| `fields.taxAmount`      | `string`                                    | Tax amount in USDC                       |
+| `fields.logoUrl`        | `string`                                    | URL to your company logo                 |
+| `fields.companyAddress` | `string`                                    | Company address                          |
+| `fields.supportEmail`   | `string`                                    | Support email shown on receipt           |
+
+After payment, receipt details also appear in the buyer's **Purchases** tab on the Locus dashboard.
+
+***
+
+## Display modes
+
+The `mode` prop controls how the checkout UI appears.
+
+### Embedded
+
+Renders inline in your page. Best for dedicated checkout pages.
+
+```tsx theme={null}
+<LocusCheckout
+  sessionId={sessionId}
+  mode="embedded"
+  style={{ maxWidth: '450px', margin: '0 auto' }}
+  onSuccess={handleSuccess}
+/>
+```
+
+### Popup
+
+Opens checkout in a centered popup window. Calls `onCancel` if the popup is closed.
+
+```tsx theme={null}
+<LocusCheckout
+  sessionId={sessionId}
+  mode="popup"
+  onSuccess={handleSuccess}
+  onCancel={handleCancel}
+/>
+```
+
+### Redirect
+
+Navigates the browser to the hosted checkout page. Renders nothing.
+
+```tsx theme={null}
+<LocusCheckout
+  sessionId={sessionId}
+  mode="redirect"
+/>
+```
+
+***
+
+## Using the hook
+
+For custom checkout buttons or non-standard flows, use `useLocusCheckout` instead of the `LocusCheckout` component.
+
+```tsx theme={null}
+import { useLocusCheckout } from '@withlocus/checkout-react';
+
+function PayButton({ sessionId }: { sessionId: string }) {
+  const { openPopup, redirectToCheckout } = useLocusCheckout();
+
+  return (
+    <div>
+      <button onClick={() => openPopup(sessionId)}>
+        Pay in Popup
+      </button>
+      <button onClick={() => redirectToCheckout(sessionId)}>
+        Pay (Full Page)
+      </button>
+    </div>
+  );
+}
+```
+
+The hook gives you `openPopup`, `redirectToCheckout`, and `getCheckoutUrl` — see the full API in the [Merchant Integration](/checkout/for-merchants#hook-uselocuscheckout) reference.
+
+
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.paywithlocus.com/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Merchant Integration
+
+> Embed Locus Checkout in your app with the React SDK
+
+## Install
+
+```bash theme={null}
+npm install @withlocus/checkout-react
+```
+
+Requires React 17+.
+
+## Embed checkout
+
+The `LocusCheckout` component takes a session ID and renders the full checkout experience. Buyers can pay with their Locus Wallet, an external wallet, or an AI agent — all handled by the component.
+
+```tsx theme={null}
+import { LocusCheckout } from '@withlocus/checkout-react';
+
+function CheckoutPage({ sessionId }: { sessionId: string }) {
+  return (
+    <LocusCheckout
+      sessionId={sessionId}
+      mode="embedded"
+      onSuccess={(data) => {
+        console.log('Paid!', data.txHash);
+        // redirect to your success page, fulfill the order, etc.
+      }}
+      onCancel={() => {
+        console.log('Buyer cancelled');
+      }}
+      onError={(error) => {
+        console.error('Checkout error:', error.message);
+      }}
+    />
+  );
+}
+```
+
+### Display modes
+
+<CardGroup cols={3}>
+  <Card title="embedded" icon="window">
+    Renders an iframe inline in your page. Best for dedicated checkout pages. The iframe loads at `minHeight: 700px`.
+  </Card>
+
+  <Card title="popup" icon="arrow-up-right-from-square">
+    Opens checkout in a centered 450x650 popup window. Shows a branded loading placeholder in the parent. Calls `onCancel` if the popup is closed.
+  </Card>
+
+  <Card title="redirect" icon="arrow-right">
+    Navigates the browser to the hosted checkout page. Renders nothing. Simplest integration.
+  </Card>
+</CardGroup>
+
+### `LocusCheckout` props
+
+| Prop          | Type                                  | Required | Default                               | Description                                                                                                    |
+| ------------- | ------------------------------------- | -------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `sessionId`   | `string`                              | Yes      | —                                     | The checkout session ID                                                                                        |
+| `mode`        | `'embedded' \| 'popup' \| 'redirect'` | No       | `'embedded'`                          | How to display the checkout UI                                                                                 |
+| `onSuccess`   | `(data: CheckoutSuccessData) => void` | No       | —                                     | Called when payment is confirmed. Receives the transaction hash, payer address, amount, and timestamps.        |
+| `onCancel`    | `() => void`                          | No       | —                                     | Called when the buyer cancels, or when a popup is closed without completing payment                            |
+| `onError`     | `(error: Error) => void`              | No       | —                                     | Called when an error occurs during checkout                                                                    |
+| `checkoutUrl` | `string`                              | No       | `'https://checkout.paywithlocus.com'` | Override the hosted checkout URL. Must be `https:` or `http:`. Invalid URLs silently fall back to the default. |
+| `style`       | `React.CSSProperties`                 | No       | —                                     | Inline styles applied to the wrapper `<div>`                                                                   |
+| `className`   | `string`                              | No       | —                                     | CSS class applied to the wrapper `<div>`                                                                       |
+
+### `CheckoutSuccessData`
+
+The object passed to your `onSuccess` callback:
+
+| Field          | Type     | Description                                |
+| -------------- | -------- | ------------------------------------------ |
+| `sessionId`    | `string` | The checkout session ID                    |
+| `amount`       | `string` | Payment amount (e.g. `"25.00"`)            |
+| `currency`     | `string` | Always `"USDC"`                            |
+| `txHash`       | `string` | On-chain transaction hash                  |
+| `payerAddress` | `string` | Wallet address that paid                   |
+| `paidAt`       | `string` | ISO 8601 timestamp of payment confirmation |
+
+### `CheckoutSession` type
+
+Represents a checkout session's current state:
+
+| Field                 | Type                                              | Description                         |
+| --------------------- | ------------------------------------------------- | ----------------------------------- |
+| `id`                  | `string`                                          | Session ID                          |
+| `amount`              | `string`                                          | Payment amount in USDC              |
+| `currency`            | `string`                                          | Always `"USDC"`                     |
+| `description`         | `string?`                                         | Description shown to the buyer      |
+| `status`              | `'PENDING' \| 'PAID' \| 'EXPIRED' \| 'CANCELLED'` | Current session status              |
+| `expiresAt`           | `string`                                          | ISO 8601 expiration timestamp       |
+| `sellerWalletAddress` | `string`                                          | Merchant's receiving wallet address |
+| `paymentTxHash`       | `string?`                                         | On-chain tx hash (set when `PAID`)  |
+| `paidAt`              | `string?`                                         | Payment timestamp (set when `PAID`) |
+
+***
+
+## Hook: `useLocusCheckout`
+
+For more control over how you launch checkout, use the hook directly instead of the component.
+
+```tsx theme={null}
+import { useLocusCheckout } from '@withlocus/checkout-react';
+
+function PayButton({ sessionId }: { sessionId: string }) {
+  const { openPopup, redirectToCheckout, getCheckoutUrl } = useLocusCheckout();
+
+  return (
+    <div>
+      <button onClick={() => openPopup(sessionId)}>Pay in Popup</button>
+      <button onClick={() => redirectToCheckout(sessionId)}>Pay (Redirect)</button>
+      <a href={getCheckoutUrl(sessionId)}>Direct Link</a>
+    </div>
+  );
+}
+```
+
+### Options
+
+| Option        | Type     | Default                               |
+| ------------- | -------- | ------------------------------------- |
+| `checkoutUrl` | `string` | `'https://checkout.paywithlocus.com'` |
+
+### Return values
+
+| Method                          | Type             | Description                                         |
+| ------------------------------- | ---------------- | --------------------------------------------------- |
+| `getCheckoutUrl(sessionId)`     | `string`         | Returns the full checkout URL for a session         |
+| `openPopup(sessionId)`          | `Window \| null` | Opens a centered 450x650 popup to the checkout page |
+| `redirectToCheckout(sessionId)` | `void`           | Navigates the browser to the checkout page          |
+
+All return values are stable across renders (wrapped in `useCallback`).
+
+***
+
+## Brand constants
+
+The SDK exports Locus brand tokens for styling surrounding UI to match:
+
+```typescript theme={null}
+import {
+  LOCUS_BRAND_COLORS,
+  LOCUS_CTA_GRADIENT,
+  LOCUS_FONT_FAMILY,
+} from '@withlocus/checkout-react';
+```
+
+<Accordion title="All brand values">
+  **`LOCUS_BRAND_COLORS`**
+
+  | Key             | Value     |
+  | --------------- | --------- |
+  | `violetPrimary` | `#4101F6` |
+  | `violetLight`   | `#5934FF` |
+  | `violetSoft`    | `#F4F0FF` |
+  | `violetMuted`   | `#E4DEFF` |
+  | `textPrimary`   | `#1B1B1C` |
+  | `border`        | `#DDDEE0` |
+  | `borderStrong`  | `#C7C8CA` |
+  | `surface`       | `#F4F4F6` |
+  | `surfacePage`   | `#FDFDFD` |
+
+  **`LOCUS_CTA_GRADIENT`**
+
+  ```
+  linear-gradient(180deg, #5934FF 0%, #4101F6 100%)
+  ```
+
+  **`LOCUS_FONT_FAMILY`**
+
+  ```
+  'Suisse Intl', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif
+  ```
+</Accordion>
+
+***
+
+## PostMessage events
+
+If you embed the checkout page in an iframe or popup manually (without the SDK), listen for these `postMessage` events from the checkout origin:
+
+| Event type               | Payload               | Description       |
+| ------------------------ | --------------------- | ----------------- |
+| `locus:checkout:success` | `CheckoutSuccessData` | Payment confirmed |
+| `locus:checkout:cancel`  | —                     | Buyer cancelled   |
+| `locus:checkout:error`   | `{ message: string }` | Error occurred    |
+
+***
+
+## Webhooks
+
+When a session is paid or expires, Locus sends a POST request to your webhook URL.
+
+### Events
+
+| Event                      | Trigger                              |
+| -------------------------- | ------------------------------------ |
+| `checkout.session.paid`    | Payment confirmed on-chain           |
+| `checkout.session.expired` | Session TTL exceeded without payment |
+
+### Payload
+
+```json theme={null}
+{
+  "event": "checkout.session.paid",
+  "data": {
+    "sessionId": "SESSION_ID",
+    "amount": "25.00",
+    "currency": "USDC",
+    "paymentTxHash": "0x...",
+    "payerAddress": "0x...",
+    "paidAt": "2026-03-01T12:00:00.000Z",
+    "metadata": { "userId": "usr_123", "plan": "pro" }
+  },
+  "timestamp": "2026-03-01T12:00:01.000Z"
+}
+```
+
+### Headers
+
+| Header            | Description                                    |
+| ----------------- | ---------------------------------------------- |
+| `X-Signature-256` | `sha256={hmac}` — HMAC-SHA256 of the JSON body |
+| `X-Webhook-Event` | Event name (e.g. `checkout.session.paid`)      |
+| `X-Session-Id`    | The session ID                                 |
+
+### Signature verification
+
+Every webhook includes an `X-Signature-256` header. The webhook secret (starts with `whsec_`) is returned when you create a session with a webhook URL. Verify it to ensure the request came from Locus.
+
+```typescript theme={null}
+import crypto from 'crypto';
+
+function verifyWebhook(payload: string, signature: string, secret: string): boolean {
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expected),
+  );
+}
+```
+
+<Warning>
+  Always verify the webhook signature before fulfilling orders.
+</Warning>
+
+***
+
+## Merchant dashboard
+
+Manage sessions, view analytics, and track purchases from the [Locus dashboard](https://app.paywithlocus.com).
+
+### Checkout instances
+
+Group sessions by integration point using an instance ID. Each instance tracks its own revenue, session count, and conversion rate. Instances are auto-created on first use.
+
+<Frame caption="Checkout instances — per-integration analytics">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-instances.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=ced6ca818c855b3ef26a360dc23b5965" alt="Checkout instances" width="2708" height="1114" data-path="images/checkout/dashboard-instances.png" />
+</Frame>
+
+### Analytics
+
+Four stats filterable by time range (7d / 30d / 90d / all time) and by instance:
+
+* **Total Revenue** — sum of USDC across paid sessions
+* **Total Sessions** — count with paid/expired breakdown
+* **Conversion Rate** — paid / total sessions
+* **Payment Methods** — breakdown of Locus Wallet, External Wallet, and Agent payments
+
+<Frame caption="Analytics — revenue, sessions, conversion rate, and payment method breakdown">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-analytics.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=a9b1bf80c7f8acac22958d3cea7d2ebd" alt="Analytics stats" width="2712" height="404" data-path="images/checkout/dashboard-analytics.png" />
+</Frame>
+
+### Recent sessions
+
+A paginated table of checkout sessions filterable by status (PAID, PENDING, EXPIRED, CANCELLED). Shows session ID, amount, status, payment method, and creation time.
+
+<Frame caption="Recent sessions table">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-sessions.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=a5919848f09dcb434ac999ebfb6b2b3b" alt="Recent sessions" width="2702" height="1836" data-path="images/checkout/dashboard-sessions.png" />
+</Frame>
+
+### Purchases
+
+The buyer-side view. Shows purchases made via any Locus checkout session, with expandable rows showing full receipt details (seller info, line items, tax, on-chain transaction link).
+
+<Frame caption="Purchases — buyer view with expandable receipt details">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-purchases.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=d3b63015966cb8c884f3c190999f11b0" alt="Purchases page" width="2702" height="1836" data-path="images/checkout/dashboard-purchases.png" />
+</Frame>
+
+
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.paywithlocus.com/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Merchant Integration
+
+> Embed Locus Checkout in your app with the React SDK
+
+## Install
+
+```bash theme={null}
+npm install @withlocus/checkout-react
+```
+
+Requires React 17+.
+
+## Embed checkout
+
+The `LocusCheckout` component takes a session ID and renders the full checkout experience. Buyers can pay with their Locus Wallet, an external wallet, or an AI agent — all handled by the component.
+
+```tsx theme={null}
+import { LocusCheckout } from '@withlocus/checkout-react';
+
+function CheckoutPage({ sessionId }: { sessionId: string }) {
+  return (
+    <LocusCheckout
+      sessionId={sessionId}
+      mode="embedded"
+      onSuccess={(data) => {
+        console.log('Paid!', data.txHash);
+        // redirect to your success page, fulfill the order, etc.
+      }}
+      onCancel={() => {
+        console.log('Buyer cancelled');
+      }}
+      onError={(error) => {
+        console.error('Checkout error:', error.message);
+      }}
+    />
+  );
+}
+```
+
+### Display modes
+
+<CardGroup cols={3}>
+  <Card title="embedded" icon="window">
+    Renders an iframe inline in your page. Best for dedicated checkout pages. The iframe loads at `minHeight: 700px`.
+  </Card>
+
+  <Card title="popup" icon="arrow-up-right-from-square">
+    Opens checkout in a centered 450x650 popup window. Shows a branded loading placeholder in the parent. Calls `onCancel` if the popup is closed.
+  </Card>
+
+  <Card title="redirect" icon="arrow-right">
+    Navigates the browser to the hosted checkout page. Renders nothing. Simplest integration.
+  </Card>
+</CardGroup>
+
+### `LocusCheckout` props
+
+| Prop          | Type                                  | Required | Default                               | Description                                                                                                    |
+| ------------- | ------------------------------------- | -------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `sessionId`   | `string`                              | Yes      | —                                     | The checkout session ID                                                                                        |
+| `mode`        | `'embedded' \| 'popup' \| 'redirect'` | No       | `'embedded'`                          | How to display the checkout UI                                                                                 |
+| `onSuccess`   | `(data: CheckoutSuccessData) => void` | No       | —                                     | Called when payment is confirmed. Receives the transaction hash, payer address, amount, and timestamps.        |
+| `onCancel`    | `() => void`                          | No       | —                                     | Called when the buyer cancels, or when a popup is closed without completing payment                            |
+| `onError`     | `(error: Error) => void`              | No       | —                                     | Called when an error occurs during checkout                                                                    |
+| `checkoutUrl` | `string`                              | No       | `'https://checkout.paywithlocus.com'` | Override the hosted checkout URL. Must be `https:` or `http:`. Invalid URLs silently fall back to the default. |
+| `style`       | `React.CSSProperties`                 | No       | —                                     | Inline styles applied to the wrapper `<div>`                                                                   |
+| `className`   | `string`                              | No       | —                                     | CSS class applied to the wrapper `<div>`                                                                       |
+
+### `CheckoutSuccessData`
+
+The object passed to your `onSuccess` callback:
+
+| Field          | Type     | Description                                |
+| -------------- | -------- | ------------------------------------------ |
+| `sessionId`    | `string` | The checkout session ID                    |
+| `amount`       | `string` | Payment amount (e.g. `"25.00"`)            |
+| `currency`     | `string` | Always `"USDC"`                            |
+| `txHash`       | `string` | On-chain transaction hash                  |
+| `payerAddress` | `string` | Wallet address that paid                   |
+| `paidAt`       | `string` | ISO 8601 timestamp of payment confirmation |
+
+### `CheckoutSession` type
+
+Represents a checkout session's current state:
+
+| Field                 | Type                                              | Description                         |
+| --------------------- | ------------------------------------------------- | ----------------------------------- |
+| `id`                  | `string`                                          | Session ID                          |
+| `amount`              | `string`                                          | Payment amount in USDC              |
+| `currency`            | `string`                                          | Always `"USDC"`                     |
+| `description`         | `string?`                                         | Description shown to the buyer      |
+| `status`              | `'PENDING' \| 'PAID' \| 'EXPIRED' \| 'CANCELLED'` | Current session status              |
+| `expiresAt`           | `string`                                          | ISO 8601 expiration timestamp       |
+| `sellerWalletAddress` | `string`                                          | Merchant's receiving wallet address |
+| `paymentTxHash`       | `string?`                                         | On-chain tx hash (set when `PAID`)  |
+| `paidAt`              | `string?`                                         | Payment timestamp (set when `PAID`) |
+
+***
+
+## Hook: `useLocusCheckout`
+
+For more control over how you launch checkout, use the hook directly instead of the component.
+
+```tsx theme={null}
+import { useLocusCheckout } from '@withlocus/checkout-react';
+
+function PayButton({ sessionId }: { sessionId: string }) {
+  const { openPopup, redirectToCheckout, getCheckoutUrl } = useLocusCheckout();
+
+  return (
+    <div>
+      <button onClick={() => openPopup(sessionId)}>Pay in Popup</button>
+      <button onClick={() => redirectToCheckout(sessionId)}>Pay (Redirect)</button>
+      <a href={getCheckoutUrl(sessionId)}>Direct Link</a>
+    </div>
+  );
+}
+```
+
+### Options
+
+| Option        | Type     | Default                               |
+| ------------- | -------- | ------------------------------------- |
+| `checkoutUrl` | `string` | `'https://checkout.paywithlocus.com'` |
+
+### Return values
+
+| Method                          | Type             | Description                                         |
+| ------------------------------- | ---------------- | --------------------------------------------------- |
+| `getCheckoutUrl(sessionId)`     | `string`         | Returns the full checkout URL for a session         |
+| `openPopup(sessionId)`          | `Window \| null` | Opens a centered 450x650 popup to the checkout page |
+| `redirectToCheckout(sessionId)` | `void`           | Navigates the browser to the checkout page          |
+
+All return values are stable across renders (wrapped in `useCallback`).
+
+***
+
+## Brand constants
+
+The SDK exports Locus brand tokens for styling surrounding UI to match:
+
+```typescript theme={null}
+import {
+  LOCUS_BRAND_COLORS,
+  LOCUS_CTA_GRADIENT,
+  LOCUS_FONT_FAMILY,
+} from '@withlocus/checkout-react';
+```
+
+<Accordion title="All brand values">
+  **`LOCUS_BRAND_COLORS`**
+
+  | Key             | Value     |
+  | --------------- | --------- |
+  | `violetPrimary` | `#4101F6` |
+  | `violetLight`   | `#5934FF` |
+  | `violetSoft`    | `#F4F0FF` |
+  | `violetMuted`   | `#E4DEFF` |
+  | `textPrimary`   | `#1B1B1C` |
+  | `border`        | `#DDDEE0` |
+  | `borderStrong`  | `#C7C8CA` |
+  | `surface`       | `#F4F4F6` |
+  | `surfacePage`   | `#FDFDFD` |
+
+  **`LOCUS_CTA_GRADIENT`**
+
+  ```
+  linear-gradient(180deg, #5934FF 0%, #4101F6 100%)
+  ```
+
+  **`LOCUS_FONT_FAMILY`**
+
+  ```
+  'Suisse Intl', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif
+  ```
+</Accordion>
+
+***
+
+## PostMessage events
+
+If you embed the checkout page in an iframe or popup manually (without the SDK), listen for these `postMessage` events from the checkout origin:
+
+| Event type               | Payload               | Description       |
+| ------------------------ | --------------------- | ----------------- |
+| `locus:checkout:success` | `CheckoutSuccessData` | Payment confirmed |
+| `locus:checkout:cancel`  | —                     | Buyer cancelled   |
+| `locus:checkout:error`   | `{ message: string }` | Error occurred    |
+
+***
+
+## Webhooks
+
+When a session is paid or expires, Locus sends a POST request to your webhook URL.
+
+### Events
+
+| Event                      | Trigger                              |
+| -------------------------- | ------------------------------------ |
+| `checkout.session.paid`    | Payment confirmed on-chain           |
+| `checkout.session.expired` | Session TTL exceeded without payment |
+
+### Payload
+
+```json theme={null}
+{
+  "event": "checkout.session.paid",
+  "data": {
+    "sessionId": "SESSION_ID",
+    "amount": "25.00",
+    "currency": "USDC",
+    "paymentTxHash": "0x...",
+    "payerAddress": "0x...",
+    "paidAt": "2026-03-01T12:00:00.000Z",
+    "metadata": { "userId": "usr_123", "plan": "pro" }
+  },
+  "timestamp": "2026-03-01T12:00:01.000Z"
+}
+```
+
+### Headers
+
+| Header            | Description                                    |
+| ----------------- | ---------------------------------------------- |
+| `X-Signature-256` | `sha256={hmac}` — HMAC-SHA256 of the JSON body |
+| `X-Webhook-Event` | Event name (e.g. `checkout.session.paid`)      |
+| `X-Session-Id`    | The session ID                                 |
+
+### Signature verification
+
+Every webhook includes an `X-Signature-256` header. The webhook secret (starts with `whsec_`) is returned when you create a session with a webhook URL. Verify it to ensure the request came from Locus.
+
+```typescript theme={null}
+import crypto from 'crypto';
+
+function verifyWebhook(payload: string, signature: string, secret: string): boolean {
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expected),
+  );
+}
+```
+
+<Warning>
+  Always verify the webhook signature before fulfilling orders.
+</Warning>
+
+***
+
+## Merchant dashboard
+
+Manage sessions, view analytics, and track purchases from the [Locus dashboard](https://app.paywithlocus.com).
+
+### Checkout instances
+
+Group sessions by integration point using an instance ID. Each instance tracks its own revenue, session count, and conversion rate. Instances are auto-created on first use.
+
+<Frame caption="Checkout instances — per-integration analytics">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-instances.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=ced6ca818c855b3ef26a360dc23b5965" alt="Checkout instances" width="2708" height="1114" data-path="images/checkout/dashboard-instances.png" />
+</Frame>
+
+### Analytics
+
+Four stats filterable by time range (7d / 30d / 90d / all time) and by instance:
+
+* **Total Revenue** — sum of USDC across paid sessions
+* **Total Sessions** — count with paid/expired breakdown
+* **Conversion Rate** — paid / total sessions
+* **Payment Methods** — breakdown of Locus Wallet, External Wallet, and Agent payments
+
+<Frame caption="Analytics — revenue, sessions, conversion rate, and payment method breakdown">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-analytics.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=a9b1bf80c7f8acac22958d3cea7d2ebd" alt="Analytics stats" width="2712" height="404" data-path="images/checkout/dashboard-analytics.png" />
+</Frame>
+
+### Recent sessions
+
+A paginated table of checkout sessions filterable by status (PAID, PENDING, EXPIRED, CANCELLED). Shows session ID, amount, status, payment method, and creation time.
+
+<Frame caption="Recent sessions table">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-sessions.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=a5919848f09dcb434ac999ebfb6b2b3b" alt="Recent sessions" width="2702" height="1836" data-path="images/checkout/dashboard-sessions.png" />
+</Frame>
+
+### Purchases
+
+The buyer-side view. Shows purchases made via any Locus checkout session, with expandable rows showing full receipt details (seller info, line items, tax, on-chain transaction link).
+
+<Frame caption="Purchases — buyer view with expandable receipt details">
+  <img src="https://mintcdn.com/locus-9b87448d/7XLendd2sjyFns6w/images/checkout/dashboard-purchases.png?fit=max&auto=format&n=7XLendd2sjyFns6w&q=85&s=d3b63015966cb8c884f3c190999f11b0" alt="Purchases page" width="2702" height="1836" data-path="images/checkout/dashboard-purchases.png" />
+</Frame>
+
+
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.paywithlocus.com/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Payment Router
+
+> On-chain contract for external wallet checkout payments
+
+The Payment Router is a smart contract on Base that processes external wallet payments for Locus Checkout. When a buyer pays with MetaMask, Coinbase Wallet, or any other external wallet, the payment goes through this contract.
+
+## Why it exists
+
+The Payment Router serves two purposes:
+
+* **Instant detection** — The contract emits a `CheckoutPayment` event with the session ID, so Locus detects payments immediately without scanning all USDC transfers.
+* **Session binding** — Each payment is tied to a specific checkout session on-chain, creating a verifiable link between the payment and the order.
+
+## Contract addresses
+
+### Payment Router
+
+| Network                | Chain ID | Address                                      |
+| ---------------------- | -------- | -------------------------------------------- |
+| Base (mainnet)         | 8453     | `0x34184b7bCB4E6519C392467402DB8a853EF57806` |
+| Base Sepolia (testnet) | 84532    | Not yet deployed                             |
+
+### USDC
+
+| Network                | Chain ID | Address                                      |
+| ---------------------- | -------- | -------------------------------------------- |
+| Base (mainnet)         | 8453     | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Base Sepolia (testnet) | 84532    | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+
+## How external wallet payments work
+
+External wallet payments require two transactions from the buyer:
+
+<Steps>
+  <Step title="Approve USDC spending">
+    The buyer approves the Payment Router to transfer the exact payment amount of USDC on their behalf.
+  </Step>
+
+  <Step title="Call pay() on the Payment Router">
+    The buyer calls `pay()` with the session ID, seller address, and amount. The contract transfers USDC from the buyer to the seller and emits a `CheckoutPayment` event.
+  </Step>
+
+  <Step title="Locus detects the event">
+    Locus listens for `CheckoutPayment` events and automatically marks the corresponding checkout session as PAID. The merchant receives a webhook.
+  </Step>
+</Steps>
+
+<Info>
+  The checkout page handles both transactions automatically — the buyer just connects their wallet and clicks "Pay". The approve + pay steps are presented as a guided flow.
+</Info>
+
+## Contract interface
+
+<Accordion title="IPaymentRouter.sol" icon="file-code">
+  ```solidity theme={null}
+  interface IPaymentRouter {
+      /// @notice Pay for a checkout session
+      function pay(
+          bytes32 sessionId,
+          address recipient,
+          uint256 amount
+      ) external;
+
+      /// @notice Pay using EIP-2612 permit (approve + pay in one transaction)
+      function payWithPermit(
+          bytes32 sessionId,
+          address recipient,
+          uint256 amount,
+          uint256 deadline,
+          uint8 v,
+          bytes32 r,
+          bytes32 s
+      ) external;
+
+      /// @notice Check if a session has already been paid on-chain
+      function sessionPaid(bytes32 sessionId) external view returns (bool);
+
+      /// @notice Get the USDC token address used by this router
+      function usdc() external view returns (address);
+
+      /// @notice Emitted on every successful payment
+      event CheckoutPayment(
+          bytes32 indexed sessionId,
+          address indexed from,
+          address indexed to,
+          uint256 amount
+      );
+
+      error InvalidRecipient();
+      error InvalidRecipientAddress();
+      error InvalidAmount();
+      error InvalidSessionId();
+      error SessionAlreadyPaid();
+  }
+  ```
+</Accordion>
+
+### Session ID encoding
+
+The `sessionId` parameter is a `bytes32` encoding of the checkout session UUID. The encoding is: remove dashes from the UUID hex string, left-align, and zero-pad to 32 bytes.
+
+```
+UUID:    a1b2c3d4-e5f6-7890-abcd-ef1234567890
+bytes32: 0xa1b2c3d4e5f67890abcdef123456789000000000000000000000000000000000
+```
+
+### USDC amounts
+
+USDC has 6 decimals. Amounts are in base units: `$25.00` = `25000000`.
+
+## Verify on BaseScan
+
+You can verify any checkout payment on BaseScan:
+
+<Steps>
+  <Step title="Open the contract">
+    Go to the [Payment Router on BaseScan](https://basescan.org/address/0x34184b7bCB4E6519C392467402DB8a853EF57806).
+  </Step>
+
+  <Step title="View events">
+    Click the **Events** tab. Look for `CheckoutPayment` events — each one shows the `sessionId`, `from` (buyer), `to` (seller), and `amount`.
+  </Step>
+
+  <Step title="Check a specific session">
+    Under the **Read Contract** tab, call `sessionPaid(bytes32)` with the encoded session ID. Returns `true` if the session has been paid on-chain.
+  </Step>
+</Steps>

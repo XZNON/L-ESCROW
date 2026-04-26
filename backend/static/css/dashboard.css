@@ -1,19 +1,22 @@
 :root {
-  --color-escrow-open:      #3b82f6;
-  --color-escrow-locked:    #f59e0b;
-  --color-escrow-completed: #10b981;
-  --color-escrow-disputed:  #ef4444;
+  --color-escrow-open:       #3b82f6;
+  --color-escrow-verifying:  #8b5cf6;
+  --color-escrow-locked:     #f59e0b;
+  --color-escrow-completed:  #10b981;
+  --color-escrow-disputed:   #ef4444;
 }
 
-.status-open      { color: var(--color-escrow-open); }
-.status-locked    { color: var(--color-escrow-locked); }
-.status-completed { color: var(--color-escrow-completed); }
-.status-disputed  { color: var(--color-escrow-disputed); }
+.status-open       { color: var(--color-escrow-open); }
+.status-verifying  { color: var(--color-escrow-verifying); }
+.status-locked     { color: var(--color-escrow-locked); }
+.status-completed  { color: var(--color-escrow-completed); }
+.status-disputed   { color: var(--color-escrow-disputed); }
 
-.badge-open      { background-color: var(--color-escrow-open); }
-.badge-locked    { background-color: var(--color-escrow-locked); }
-.badge-completed { background-color: var(--color-escrow-completed); }
-.badge-disputed  { background-color: var(--color-escrow-disputed); }
+.badge-open       { background-color: var(--color-escrow-open); }
+.badge-verifying  { background-color: var(--color-escrow-verifying); }
+.badge-locked     { background-color: var(--color-escrow-locked); }
+.badge-completed  { background-color: var(--color-escrow-completed); }
+.badge-disputed   { background-color: var(--color-escrow-disputed); }
 
 .toast {
   position: fixed;

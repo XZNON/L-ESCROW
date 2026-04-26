@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:beta.paywithlocus.com)",
+      "WebFetch(domain:beta-api.paywithlocus.com)"
+    ]
+  }
+}

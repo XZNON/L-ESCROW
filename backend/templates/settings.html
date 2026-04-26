@@ -9,9 +9,10 @@
 
 <form id="mandate-form" class="space-y-6 max-w-lg">
 
-  <div>
+  <div class="pb-4 border-b border-gray-800">
+    <p class="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-4">Buyer Wallet (Primary Account)</p>
     <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-      Locus API Key
+      Buyer Locus API Key
     </label>
     <input
       type="password"
@@ -21,7 +22,23 @@
       required
       class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
     />
-    <p class="text-gray-600 text-xs mt-1">Stored securely — never shared with agents. Leave blank to keep existing key.</p>
+    <p class="text-gray-600 text-xs mt-1">This wallet pays checkout sessions. Must have USDC balance.</p>
+  </div>
+
+  <div class="pb-4 border-b border-gray-800">
+    <p class="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-4">Merchant Wallet (Seller Account)</p>
+    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+      Merchant Locus API Key
+    </label>
+    <input
+      type="password"
+      name="merchant_locus_token"
+      placeholder="claw_…"
+      autocomplete="off"
+      required
+      class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+    />
+    <p class="text-gray-600 text-xs mt-1">This wallet creates checkout sessions and receives payments (your second Locus account).</p>
   </div>
 
   <div class="grid grid-cols-2 gap-4">
