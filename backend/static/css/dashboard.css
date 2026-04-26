@@ -1,0 +1,32 @@
+:root {
+  --color-escrow-open:      #3b82f6;
+  --color-escrow-locked:    #f59e0b;
+  --color-escrow-completed: #10b981;
+  --color-escrow-disputed:  #ef4444;
+}
+
+.status-open      { color: var(--color-escrow-open); }
+.status-locked    { color: var(--color-escrow-locked); }
+.status-completed { color: var(--color-escrow-completed); }
+.status-disputed  { color: var(--color-escrow-disputed); }
+
+.badge-open      { background-color: var(--color-escrow-open); }
+.badge-locked    { background-color: var(--color-escrow-locked); }
+.badge-completed { background-color: var(--color-escrow-completed); }
+.badge-disputed  { background-color: var(--color-escrow-disputed); }
+
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  color: #fff;
+  font-size: 0.875rem;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.toast.show { opacity: 1; }
+.toast.success { background-color: var(--color-escrow-completed); }
+.toast.error   { background-color: var(--color-escrow-disputed); }

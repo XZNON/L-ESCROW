@@ -10,6 +10,7 @@ This feature establishes the L-ESCROW Command Center, the primary human-to-agent
 
 - Initial project scaffolding (Step 00)
 - Locus SDK Environment Variables (API Keys/Base Network config)
+- Your can find the skill related to Locus SDK at @C:\Users\XZNON\.locus\skills\SKILL.md
 
 ---
 

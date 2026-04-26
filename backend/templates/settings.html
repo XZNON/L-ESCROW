@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Settings — L-ESCROW{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-white mb-1">Settings</h1>
+  <p class="text-gray-500 text-sm">Connect your Locus wallet and configure spending mandates for the agent squad.</p>
+</div>
+
+<form id="mandate-form" class="space-y-6 max-w-lg">
+
+  <div>
+    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+      Locus API Key
+    </label>
+    <input
+      type="password"
+      name="locus_auth_token"
+      placeholder="claw_…"
+      autocomplete="off"
+      required
+      class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+    />
+    <p class="text-gray-600 text-xs mt-1">Stored securely — never shared with agents. Leave blank to keep existing key.</p>
+  </div>
+
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+        Max Task Budget (USDC)
+      </label>
+      <input
+        type="number"
+        name="max_task_budget"
+        step="0.01"
+        min="0"
+        value="{{ "%.2f"|format(owner.max_task_budget) if owner.max_task_budget else '0.00' }}"
+        required
+        class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+      />
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+        Daily Limit (USDC)
+      </label>
+      <input
+        type="number"
+        name="daily_limit"
+        step="0.01"
+        min="0"
+        value="{{ "%.2f"|format(owner.daily_limit) if owner.daily_limit else '0.00' }}"
+        required
+        class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+      />
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+      Min Assessor Reputation Score (0–5)
+    </label>
+    <input
+      type="number"
+      name="required_assessor_score"
+      step="0.1"
+      min="0"
+      max="5"
+      value="{{ policy.required_assessor_score if policy.required_assessor_score else '4.5' }}"
+      required
+      class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+    />
+    <p class="text-gray-600 text-xs mt-1">Only Assessor Agents with this score or higher will be assigned to verify work.</p>
+  </div>
+
+  <button
+    type="submit"
+    class="w-full bg-amber-400 hover:bg-amber-300 text-gray-950 font-bold text-sm py-2.5 rounded-lg transition-colors disabled:opacity-50"
+  >
+    Save &amp; Connect Wallet
+  </button>
+
+</form>
+{% endblock %}
