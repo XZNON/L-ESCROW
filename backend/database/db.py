@@ -67,6 +67,11 @@ def init_db() -> None:
             "ALTER TABLE rfps ADD COLUMN assessor_verdict TEXT",
             "ALTER TABLE rfps ADD COLUMN verified_at TIMESTAMP",
             "ALTER TABLE rfps ADD COLUMN checkout_url TEXT",
+            "ALTER TABLE rfps ADD COLUMN judge_a_verdict TEXT",
+            "ALTER TABLE rfps ADD COLUMN judge_a_reasoning TEXT",
+            "ALTER TABLE rfps ADD COLUMN judge_b_verdict TEXT",
+            "ALTER TABLE rfps ADD COLUMN judge_b_reasoning TEXT",
+            "ALTER TABLE rfps ADD COLUMN conflict_notes TEXT",
         ]:
             try:
                 conn.execute(migration)
@@ -238,17 +243,41 @@ def get_locked_rfps() -> list[dict]:
 
 
 def get_active_pacts() -> list[dict]:
-    """Returns Locked/Completed/Disputed RFPs joined with their accepted bid."""
+    """Returns Locked/Completed/Disputed/Conflict RFPs joined with their accepted bid."""
     with _connect() as conn:
         rows = conn.execute(
             """SELECT r.id, r.task_spec, r.status, r.escrow_session_id,
+                      r.judge_a_verdict, r.judge_a_reasoning,
+                      r.judge_b_verdict, r.judge_b_reasoning,
                       b.seller_id, b.bid_amount
                FROM rfps r
                LEFT JOIN bids b ON b.rfp_id = r.id AND b.status = 'Accepted'
-               WHERE r.status IN ('Locked', 'Completed', 'Disputed')
+               WHERE r.status IN ('Locked', 'Completed', 'Disputed', 'Conflict')
                ORDER BY r.created_at DESC"""
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def conflict_rfp(
+    rfp_id: str, verdict_a: str, reasoning_a: str, verdict_b: str, reasoning_b: str
+) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """UPDATE rfps SET status = 'Conflict',
+               judge_a_verdict = ?, judge_a_reasoning = ?,
+               judge_b_verdict = ?, judge_b_reasoning = ?,
+               conflict_notes = ?
+               WHERE id = ?""",
+            (verdict_a, reasoning_a, verdict_b, reasoning_b,
+             f"Judge A (Groq): {verdict_a} | Judge B (Gemini): {verdict_b}", rfp_id),
+        )
+
+
+def settle_conflict(rfp_id: str, assessor_id: str, verdict: str) -> None:
+    if verdict == "PASS":
+        complete_rfp(rfp_id, assessor_id, "PASS")
+    else:
+        dispute_rfp(rfp_id, assessor_id, "FAIL")
 
 
 def complete_rfp(rfp_id: str, assessor_id: str, verdict: str) -> None:

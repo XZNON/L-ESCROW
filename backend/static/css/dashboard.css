@@ -4,6 +4,7 @@
   --color-escrow-locked:     #f59e0b;
   --color-escrow-completed:  #10b981;
   --color-escrow-disputed:   #ef4444;
+  --color-escrow-conflict:   #a855f7;
 }
 
 .status-open       { color: var(--color-escrow-open); }
@@ -17,6 +18,8 @@
 .badge-locked     { background-color: var(--color-escrow-locked); }
 .badge-completed  { background-color: var(--color-escrow-completed); }
 .badge-disputed   { background-color: var(--color-escrow-disputed); }
+.badge-conflict   { background-color: var(--color-escrow-conflict); }
+.status-conflict  { color: var(--color-escrow-conflict); }
 
 .toast {
   position: fixed;

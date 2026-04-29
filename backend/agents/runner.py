@@ -8,7 +8,7 @@ Environment variables:
     BASE_URL        FastAPI server URL (default: http://localhost:8000)
     SELLER_EMAIL    Email for the Seller agent (default: seller@lescrow.dev)
     FORCE_VERDICT   Override Assessor verdict: "PASS" or "FAIL" (default: LLM decides)
-    GROQ_API_KEY  Required for Assessor LLM calls
+    GROQ_API_KEY  Required for both Assessor judges (Judge A: llama-3.3-70b-versatile, Judge B: gemma2-9b-it)
 """
 
 import asyncio

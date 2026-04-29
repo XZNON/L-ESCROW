@@ -76,13 +76,15 @@
           <th class="px-4 py-3 text-left">Seller</th>
           <th class="px-4 py-3 text-right">Amount</th>
           <th class="px-4 py-3 text-center">Status</th>
+          <th class="px-4 py-3 text-center">Jury</th>
         </tr>
       </thead>
       <tbody>
         {% if active_pacts %}
           {% for pact in active_pacts %}
             {% set s = pact.status | lower %}
-            <tr class="border-t border-gray-800">
+            {% set is_conflict = pact.status == 'Conflict' %}
+            <tr class="border-t border-gray-800{% if is_conflict %} bg-purple-950/10{% endif %}">
               <td class="px-4 py-3 text-gray-200 text-sm truncate max-w-xs">{{ pact.task_spec }}</td>
               <td class="px-4 py-3 text-gray-400 font-mono text-xs">
                 {% if pact.seller_id %}{{ pact.seller_id[:12] }}…{% else %}—{% endif %}
@@ -93,11 +95,54 @@
               <td class="px-4 py-3 text-center">
                 <span class="px-2 py-0.5 rounded-full text-xs font-semibold text-white badge-{{ s }}">{{ pact.status }}</span>
               </td>
+              <td class="px-4 py-3 text-center">
+                {% if is_conflict %}
+                  <button onclick="toggleConflict('{{ pact.id }}')"
+                    class="text-xs text-purple-400 hover:text-purple-300 underline underline-offset-2">
+                    View &amp; Settle
+                  </button>
+                {% else %}
+                  <span class="text-gray-700 text-xs">—</span>
+                {% endif %}
+              </td>
             </tr>
+            {% if is_conflict %}
+            <tr id="conflict-{{ pact.id }}" class="hidden border-t border-purple-900/30 bg-purple-950/20">
+              <td colspan="5" class="px-5 py-4">
+                <div class="grid grid-cols-2 gap-6 mb-4">
+                  <div>
+                    <p class="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-1">Judge A — Llama 3.3</p>
+                    <p class="text-sm font-bold {% if pact.judge_a_verdict == 'PASS' %}text-emerald-400{% else %}text-red-400{% endif %}">
+                      {{ pact.judge_a_verdict or '—' }}
+                    </p>
+                    <p class="text-xs text-gray-400 mt-1 leading-relaxed">{{ pact.judge_a_reasoning or '—' }}</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-purple-400 font-semibold uppercase tracking-wider mb-1">Judge B — Gemma 2</p>
+                    <p class="text-sm font-bold {% if pact.judge_b_verdict == 'PASS' %}text-emerald-400{% else %}text-red-400{% endif %}">
+                      {{ pact.judge_b_verdict or '—' }}
+                    </p>
+                    <p class="text-xs text-gray-400 mt-1 leading-relaxed">{{ pact.judge_b_reasoning or '—' }}</p>
+                  </div>
+                </div>
+                <p class="text-xs text-gray-500 mb-3">The two judges disagree. As the human owner, you have the final say.</p>
+                <div class="flex gap-2">
+                  <button onclick="settleConflict('{{ pact.id }}', 'PASS')"
+                    class="px-3 py-1.5 rounded text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+                    Release Funds (PASS)
+                  </button>
+                  <button onclick="settleConflict('{{ pact.id }}', 'FAIL')"
+                    class="px-3 py-1.5 rounded text-xs font-semibold bg-red-700 hover:bg-red-600 text-white transition-colors">
+                    Refund Buyer (FAIL)
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
           {% endfor %}
         {% else %}
           <tr>
-            <td colspan="4" class="px-4 py-10 text-center text-gray-600 text-sm">
+            <td colspan="5" class="px-4 py-10 text-center text-gray-600 text-sm">
               No active pacts —
               <a href="/marketplace" class="text-amber-400 hover:underline">open the Marketplace</a>
               to see agent activity.
@@ -108,6 +153,28 @@
     </table>
   </div>
 </div>
+
+<script>
+function toggleConflict(rfpId) {
+  const row = document.getElementById('conflict-' + rfpId);
+  if (row) row.classList.toggle('hidden');
+}
+
+async function settleConflict(rfpId, verdict) {
+  const res = await fetch('/api/v1/settle-conflict', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({rfp_id: rfpId, verdict}),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast(`Settled as ${data.status}`, 'success');
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    showToast(data.error || 'Failed to settle', 'error');
+  }
+}
+</script>
 
 {% if demo_mode %}
 <script>

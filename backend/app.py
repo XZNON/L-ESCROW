@@ -386,6 +386,81 @@ async def verify_rfp(body: VerifyRequest):
     }
 
 
+# ── Conflict reporting & settlement ──────────────────────────────────────────
+
+class ConflictRequest(BaseModel):
+    rfp_id: str
+    assessor_id: str
+    verdict_a: str
+    reasoning_a: str
+    verdict_b: str
+    reasoning_b: str
+
+
+class SettleRequest(BaseModel):
+    rfp_id: str
+    verdict: str   # "PASS" or "FAIL"
+
+
+@app.post("/api/v1/report-conflict")
+async def report_conflict(body: ConflictRequest):
+    if body.verdict_a not in ("PASS", "FAIL") or body.verdict_b not in ("PASS", "FAIL"):
+        return JSONResponse({"success": False, "error": "verdicts must be PASS or FAIL"}, status_code=400)
+
+    rfp = db.get_rfp(body.rfp_id)
+    if not rfp:
+        return JSONResponse({"success": False, "error": "RFP not found"}, status_code=404)
+    if rfp["status"] != "Locked":
+        return JSONResponse(
+            {"success": False, "error": f"RFP is {rfp['status']}, must be Locked"},
+            status_code=409,
+        )
+
+    db.conflict_rfp(body.rfp_id, body.verdict_a, body.reasoning_a, body.verdict_b, body.reasoning_b)
+    return {"success": True, "status": "Conflict"}
+
+
+@app.post("/api/v1/settle-conflict")
+async def settle_conflict(body: SettleRequest):
+    if body.verdict not in ("PASS", "FAIL"):
+        return JSONResponse({"success": False, "error": "verdict must be PASS or FAIL"}, status_code=400)
+
+    rfp = db.get_rfp(body.rfp_id)
+    if not rfp:
+        return JSONResponse({"success": False, "error": "RFP not found"}, status_code=404)
+    if rfp["status"] != "Conflict":
+        return JSONResponse(
+            {"success": False, "error": f"RFP is {rfp['status']}, must be Conflict"},
+            status_code=409,
+        )
+
+    db.settle_conflict(body.rfp_id, "human-owner", body.verdict)
+
+    refund_initiated = False
+    if body.verdict == "FAIL":
+        session_id = rfp.get("escrow_session_id")
+        if session_id:
+            owner = db.get_owner()
+            merchant_token = owner.get("merchant_locus_token")
+            if merchant_token:
+                async with httpx.AsyncClient() as client:
+                    try:
+                        cancel_resp = await client.post(
+                            f"{LOCUS_API_BASE}/checkout/sessions/{session_id}/cancel",
+                            headers={"Authorization": f"Bearer {merchant_token}"},
+                            timeout=10,
+                        )
+                        refund_initiated = cancel_resp.status_code in (200, 201, 202, 204)
+                    except httpx.RequestError:
+                        pass
+
+    status = "Completed" if body.verdict == "PASS" else "Disputed"
+    result = {"success": True, "status": status, "verdict": body.verdict}
+    if body.verdict == "FAIL":
+        result["refund_initiated"] = refund_initiated
+    return result
+
+
 # ── Demo trigger ─────────────────────────────────────────────────────────────
 
 DEMO_TASK_SPECS = [
