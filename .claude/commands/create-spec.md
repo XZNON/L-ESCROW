@@ -34,6 +34,8 @@ From $ARGUMENTS extract:
 4. `branch_name` — format: `feature/<feature_slug>`
    - Example: `feature/registration`
 
+5. `file_path` — path to the markdown file explaining what the next feature requires.
+
 If you cannot infer these from $ARGUMENTS, ask the user
 to clarify before proceeding.
 
@@ -68,6 +70,7 @@ Read these files before writing the spec:
 - `app.py` — existing routes and structure
 - `database/db.py` — existing schema and functions
 - All files in `.claude/specs/` — avoid duplicating existing specs
+- The Feature file passed in $ARGUMENTS.
 
 Check `CLAUDE.md` to confirm the requested step is not already
 marked complete. If it is, warn the user and stop.
