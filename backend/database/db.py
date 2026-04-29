@@ -63,6 +63,10 @@ def init_db() -> None:
             "ALTER TABLE rfps ADD COLUMN webhook_secret TEXT",
             "ALTER TABLE rfps ADD COLUMN verifying_bid_id TEXT",
             "ALTER TABLE bids ADD COLUMN locus_transaction_id TEXT",
+            "ALTER TABLE rfps ADD COLUMN assessor_id TEXT",
+            "ALTER TABLE rfps ADD COLUMN assessor_verdict TEXT",
+            "ALTER TABLE rfps ADD COLUMN verified_at TIMESTAMP",
+            "ALTER TABLE rfps ADD COLUMN checkout_url TEXT",
         ]:
             try:
                 conn.execute(migration)
@@ -157,15 +161,15 @@ def get_rfp_by_session(session_id: str) -> dict | None:
 
 
 def set_rfp_verifying(
-    rfp_id: str, session_id: str, webhook_secret: str, bid_id: str
+    rfp_id: str, session_id: str, webhook_secret: str, bid_id: str, checkout_url: str = ""
 ) -> None:
     with _connect() as conn:
         conn.execute(
             """UPDATE rfps
                SET status = 'Verifying', escrow_session_id = ?,
-                   webhook_secret = ?, verifying_bid_id = ?
+                   webhook_secret = ?, verifying_bid_id = ?, checkout_url = ?
                WHERE id = ?""",
-            (session_id, webhook_secret, bid_id, rfp_id),
+            (session_id, webhook_secret, bid_id, checkout_url, rfp_id),
         )
 
 
@@ -220,4 +224,48 @@ def accept_bid(bid_id: str, rfp_id: str, session_id: str, transaction_id: str) -
         conn.execute(
             "UPDATE bids SET status = 'Rejected' WHERE rfp_id = ? AND id != ?",
             (rfp_id, bid_id),
+        )
+
+
+# ── Assessor / verdict functions ──────────────────────────────────────────────
+
+def get_locked_rfps() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM rfps WHERE status = 'Locked' ORDER BY created_at ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_active_pacts() -> list[dict]:
+    """Returns Locked/Completed/Disputed RFPs joined with their accepted bid."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT r.id, r.task_spec, r.status, r.escrow_session_id,
+                      b.seller_id, b.bid_amount
+               FROM rfps r
+               LEFT JOIN bids b ON b.rfp_id = r.id AND b.status = 'Accepted'
+               WHERE r.status IN ('Locked', 'Completed', 'Disputed')
+               ORDER BY r.created_at DESC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def complete_rfp(rfp_id: str, assessor_id: str, verdict: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """UPDATE rfps SET status = 'Completed', assessor_id = ?,
+               assessor_verdict = ?, verified_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (assessor_id, verdict, rfp_id),
+        )
+
+
+def dispute_rfp(rfp_id: str, assessor_id: str, verdict: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """UPDATE rfps SET status = 'Disputed', assessor_id = ?,
+               assessor_verdict = ?, verified_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (assessor_id, verdict, rfp_id),
         )

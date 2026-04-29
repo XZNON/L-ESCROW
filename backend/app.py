@@ -15,8 +15,11 @@ from pydantic import BaseModel
 
 from backend.database import db
 
+import os
+
 LOCUS_API_BASE = "https://beta-api.paywithlocus.com/api"
-CHECKOUT_BASE_URL = "https://checkout.beta.paywithlocus.com"
+CHECKOUT_BASE_URL = "https://checkout.paywithlocus.com"
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 
 BASE_DIR = Path(__file__).parent
 
@@ -40,9 +43,17 @@ async def dashboard(request: Request):
     owner = db.get_owner()
     policy = db.get_policy()
     wallet_connected = bool(owner.get("locus_auth_token"))
+    active_pacts = db.get_active_pacts()
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "wallet_connected": wallet_connected, "owner": owner, "policy": policy},
+        {
+            "request": request,
+            "wallet_connected": wallet_connected,
+            "owner": owner,
+            "policy": policy,
+            "active_pacts": active_pacts,
+            "demo_mode": DEMO_MODE,
+        },
     )
 
 
@@ -95,7 +106,7 @@ async def save_mandate(body: MandateRequest):
     return {
         "success": True,
         "wallet_address": buyer_data.get("wallet_address"),
-        "balance": buyer_data.get("balance"),
+        "balance": buyer_data.get("usdc_balance"),
     }
 
 
@@ -120,7 +131,7 @@ async def get_balance():
         return JSONResponse({"success": False, "error": "Locus API error"}, status_code=resp.status_code)
 
     data = resp.json().get("data", {})
-    return {"success": True, "balance": data.get("balance"), "wallet_address": data.get("wallet_address")}
+    return {"success": True, "balance": data.get("usdc_balance"), "wallet_address": data.get("wallet_address")}
 
 
 # ── Marketplace page ──────────────────────────────────────────────────────────
@@ -131,7 +142,7 @@ async def marketplace(request: Request):
     rfps_with_bids = [{"rfp": r, "bids": db.get_bids_for_rfp(r["id"])} for r in rfps]
     return templates.TemplateResponse(
         "marketplace.html",
-        {"request": request, "rfps_with_bids": rfps_with_bids},
+        {"request": request, "rfps_with_bids": rfps_with_bids, "demo_mode": DEMO_MODE},
     )
 
 
@@ -162,6 +173,12 @@ async def create_rfp(body: RFPRequest):
         body.deadline_seconds, body.min_reputation, body.verification_type,
     )
     return {"success": True, "rfp_id": rfp_id}
+
+
+async def _demo_confirm(bid_id: str, rfp_id: str, session_id: str) -> None:
+    """Demo mode: simulate Locus PAID confirmation after a short delay."""
+    await asyncio.sleep(4)
+    db.accept_bid(bid_id, rfp_id, session_id, f"demo-tx-{bid_id[:8]}")
 
 
 async def _poll_and_confirm(
@@ -248,7 +265,20 @@ async def create_bid(body: BidRequest, background_tasks: BackgroundTasks):
     )
 
     # ── Step 2: Mark RFP as Verifying (before paying) ─────────────────────────
-    db.set_rfp_verifying(body.rfp_id, session_id, webhook_secret, bid_id)
+    db.set_rfp_verifying(body.rfp_id, session_id, webhook_secret, bid_id, checkout_url)
+
+    if DEMO_MODE:
+        # ── Demo: real Locus session created above; simulate PAID after 4s ────
+        background_tasks.add_task(_demo_confirm, bid_id, body.rfp_id, session_id)
+        return {
+            "success": True,
+            "bid_id": bid_id,
+            "accepted": True,
+            "status": "verifying",
+            "checkout_url": checkout_url,
+            "session_id": session_id,
+            "demo": True,
+        }
 
     # ── Step 3: Buyer agent pays the session ───────────────────────────────────
     async with httpx.AsyncClient() as client:
@@ -298,6 +328,146 @@ async def list_bids(rfp_id: str):
     if not rfp:
         return JSONResponse({"success": False, "error": "RFP not found"}, status_code=404)
     return {"success": True, "bids": db.get_bids_for_rfp(rfp_id)}
+
+
+# ── Assessor verify ──────────────────────────────────────────────────────────
+
+class VerifyRequest(BaseModel):
+    rfp_id: str
+    assessor_id: str
+    verdict: str        # "PASS" or "FAIL"
+    delivery_note: str
+
+
+@app.post("/api/v1/verify")
+async def verify_rfp(body: VerifyRequest):
+    if body.verdict not in ("PASS", "FAIL"):
+        return JSONResponse({"success": False, "error": "verdict must be PASS or FAIL"}, status_code=400)
+
+    rfp = db.get_rfp(body.rfp_id)
+    if not rfp:
+        return JSONResponse({"success": False, "error": "RFP not found"}, status_code=404)
+    if rfp["status"] != "Locked":
+        return JSONResponse(
+            {"success": False, "error": f"RFP is {rfp['status']}, must be Locked"},
+            status_code=409,
+        )
+
+    if body.verdict == "PASS":
+        db.complete_rfp(body.rfp_id, body.assessor_id, "PASS")
+        return {"success": True, "status": "Completed", "verdict": "PASS"}
+
+    # FAIL path — mark disputed then attempt Locus cancel
+    db.dispute_rfp(body.rfp_id, body.assessor_id, "FAIL")
+
+    session_id = rfp.get("escrow_session_id")
+    refund_initiated = False
+    if session_id:
+        owner = db.get_owner()
+        merchant_token = owner.get("merchant_locus_token")
+        if merchant_token:
+            async with httpx.AsyncClient() as client:
+                try:
+                    cancel_resp = await client.post(
+                        f"{LOCUS_API_BASE}/checkout/sessions/{session_id}/cancel",
+                        headers={"Authorization": f"Bearer {merchant_token}"},
+                        timeout=10,
+                    )
+                    refund_initiated = cancel_resp.status_code in (200, 201, 202, 204)
+                except httpx.RequestError:
+                    pass
+
+    return {
+        "success": True,
+        "status": "Disputed",
+        "verdict": "FAIL",
+        "refund_initiated": refund_initiated,
+        **({"note": "manual_resolution_required"} if not refund_initiated else {}),
+    }
+
+
+# ── Demo trigger ─────────────────────────────────────────────────────────────
+
+DEMO_TASK_SPECS = [
+    "Build a REST API endpoint for JWT authentication with refresh token rotation.",
+    "Write a Python script that scrapes product prices and stores them in SQLite.",
+    "Create a Dockerfile for a FastAPI app with multi-stage build and health check.",
+    "Implement a rate limiter middleware for an Express.js application.",
+    "Design and implement a webhook delivery system with retry logic and dead-letter queue.",
+]
+_demo_counter = 0
+
+
+@app.post("/api/v1/demo/run")
+async def demo_run(background_tasks: BackgroundTasks):
+    global _demo_counter
+    if not DEMO_MODE:
+        return JSONResponse({"success": False, "error": "Start server with DEMO_MODE=true"}, status_code=400)
+
+    owner = db.get_owner()
+    max_budget = owner.get("max_task_budget") or 0
+    if max_budget <= 0:
+        return JSONResponse({"success": False, "error": "Set max_task_budget > 0 in Settings first"}, status_code=400)
+
+    buyer_token = owner.get("locus_auth_token")
+    merchant_token = owner.get("merchant_locus_token")
+    if not buyer_token or not merchant_token:
+        return JSONResponse({"success": False, "error": "Configure Locus tokens in Settings first"}, status_code=400)
+
+    task_spec = DEMO_TASK_SPECS[_demo_counter % len(DEMO_TASK_SPECS)]
+    _demo_counter += 1
+    bid_amount = round(max_budget * 0.85, 2)
+
+    rfp_id = str(uuid.uuid4())
+    bid_id = str(uuid.uuid4())
+
+    db.create_rfp(rfp_id, "demo-buyer", task_spec, max_budget, 1800, 0.0, "llm")
+    db.create_bid(bid_id, rfp_id, "seller-agent-01", "seller@lescrow.dev", bid_amount, 1800)
+
+    # Create a real Locus checkout session — this proves the integration is live
+    async with httpx.AsyncClient() as client:
+        try:
+            session_resp = await client.post(
+                f"{LOCUS_API_BASE}/checkout/sessions",
+                headers={"Authorization": f"Bearer {merchant_token}"},
+                json={
+                    "amount": str(bid_amount),
+                    "description": f"L-ESCROW: {task_spec[:80]}",
+                    "metadata": {"rfp_id": rfp_id, "bid_id": bid_id, "demo": True},
+                },
+                timeout=15,
+            )
+        except httpx.RequestError:
+            return JSONResponse({"success": False, "error": "Could not reach Locus API"}, status_code=502)
+
+    if session_resp.status_code not in (200, 201):
+        body_json = session_resp.json()
+        err = body_json.get("message") or body_json.get("error") or "session_creation_failed"
+        return JSONResponse({"success": False, "error": err, "locus_status": session_resp.status_code}, status_code=502)
+
+    session_data = session_resp.json().get("data", session_resp.json())
+    session_id = session_data.get("id") or session_data.get("sessionId") or session_data.get("session_id")
+    webhook_secret = session_data.get("webhookSecret") or session_data.get("webhook_secret") or ""
+    checkout_url = (
+        session_data.get("checkoutUrl")
+        or session_data.get("checkout_url")
+        or session_data.get("url")
+        or f"{CHECKOUT_BASE_URL}/{session_id}"
+    )
+
+    db.set_rfp_verifying(rfp_id, session_id, webhook_secret, bid_id, checkout_url)
+
+    # Simulate PAID after 4s — the rest of the lifecycle (Assessor LLM, verify) runs for real
+    background_tasks.add_task(_demo_confirm, bid_id, rfp_id, session_id)
+
+    return {
+        "success": True,
+        "rfp_id": rfp_id,
+        "bid_id": bid_id,
+        "session_id": session_id,
+        "checkout_url": checkout_url,
+        "message": "Demo cycle started — real Locus session created, payment simulates in 4s, Assessor will verify via LLM.",
+    }
 
 
 # ── Debug ────────────────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ Context for AI agents working inside the `backend/` directory of L-ESCROW.
 
 ## What this directory contains
 
-All server-side code: FastAPI application, SQLite database layer, Jinja2 templates, and static assets. The entry point is `backend/app.py`. Run from the repo root with `uvicorn backend.app:app --reload`.
+All server-side code: FastAPI application, SQLite database layer, Jinja2 templates, static assets, and LangGraph autonomous agents. The entry point is `backend/app.py`. Run from the repo root with `uvicorn backend.app:app --reload`.
 
 ---
 
@@ -16,9 +16,9 @@ All routes are registered in `backend/app.py`. No route files or routers — eve
 
 | Route | Template | Purpose |
 |---|---|---|
-| `GET /` | `dashboard.html` | Wallet status, balance card, active pacts feed |
+| `GET /` | `dashboard.html` | Wallet status, balance card, live active pacts feed |
 | `GET /settings` | `settings.html` | Mandate form — buyer key, merchant key, budgets |
-| `GET /marketplace` | `marketplace.html` | Live RFP bulletin board with bids |
+| `GET /marketplace` | `marketplace.html` | Live RFP bulletin board with bids (auto-refreshes 10s) |
 
 ### API routes
 
@@ -30,10 +30,18 @@ All routes are registered in `backend/app.py`. No route files or routers — eve
 | `POST /api/v1/bid` | — | Submit bid; triggers full Locus Checkout flow if within budget |
 | `GET /api/v1/rfps` | — | List RFPs, optional `?status=` filter |
 | `GET /api/v1/rfps/{rfp_id}/bids` | — | List bids for one RFP |
+| `POST /api/v1/verify` | — | Assessor PASS/FAIL verdict; PASS→Completed, FAIL→Disputed + Locus cancel |
 | `POST /api/v1/webhook/locus` | HMAC | Locus event receiver — `checkout.session.paid` |
 | `GET /api/v1/debug/payment/{tx_id}` | — | Dev tool — inspect Locus transaction |
 
-**Not yet built**: `POST /api/v1/verify` — Assessor PASS/FAIL endpoint.
+### Pydantic request models
+
+```python
+MandateRequest   # locus_auth_token, merchant_locus_token, max_task_budget, daily_limit, required_assessor_score
+RFPRequest       # buyer_id, task_spec, max_budget, deadline_seconds, min_reputation, verification_type
+BidRequest       # rfp_id, seller_id, seller_email, bid_amount, eta_seconds
+VerifyRequest    # rfp_id, assessor_id, verdict ("PASS"|"FAIL"), delivery_note
+```
 
 ---
 
@@ -77,6 +85,23 @@ A bid qualifies for auto-payment when `bid_amount <= rfp.max_budget` and both to
 
 ---
 
+## Verify / Settlement Flow (inside `POST /api/v1/verify`)
+
+Called by the Assessor Agent after LLM reasoning. Guarded: returns 409 if RFP is not `Locked`.
+
+```
+PASS → db.complete_rfp(rfp_id, assessor_id, "PASS")
+     → RFP status: Locked → Completed
+     → No Locus call (funds already settled at checkout; seller claims independently)
+
+FAIL → db.dispute_rfp(rfp_id, assessor_id, "FAIL")
+     → RFP status: Locked → Disputed
+     → Attempt POST /checkout/sessions/{session_id}/cancel (merchant token)
+     → If cancel unsupported: returns {"note": "manual_resolution_required"}
+```
+
+---
+
 ## database/db.py — Function Reference
 
 ### Owner / Policy
@@ -97,6 +122,10 @@ A bid qualifies for auto-payment when `bid_amount <= rfp.max_budget` and both to
 | `get_rfp_by_session(session_id) -> dict\|None` | Webhook lookup by Locus session id |
 | `set_rfp_verifying(rfp_id, session_id, webhook_secret, bid_id)` | Transition to Verifying |
 | `revert_rfp_to_open(rfp_id)` | Rollback on payment failure — clears session, resets bid to Pending |
+| `get_locked_rfps() -> list[dict]` | All Locked RFPs — used by Assessor Agent polling |
+| `get_active_pacts() -> list[dict]` | Locked/Completed/Disputed RFPs joined with accepted bid — used by dashboard |
+| `complete_rfp(rfp_id, assessor_id, verdict)` | Transition Locked → Completed, record assessor + timestamp |
+| `dispute_rfp(rfp_id, assessor_id, verdict)` | Transition Locked → Disputed, record assessor + timestamp |
 
 ### Bids
 | Function | Description |
@@ -125,6 +154,9 @@ A bid qualifies for auto-payment when `bid_amount <= rfp.max_budget` and both to
 - `escrow_session_id TEXT` — Locus session id (set during Verifying)
 - `webhook_secret TEXT` — HMAC secret for webhook verification
 - `verifying_bid_id TEXT` — bid currently in flight (cleared after accept/revert)
+- `assessor_id TEXT` — identity of assessor that submitted verdict
+- `assessor_verdict TEXT` — `PASS` or `FAIL`
+- `verified_at TIMESTAMP` — when verdict was submitted
 - `created_at TIMESTAMP`
 
 **`bids`**:
@@ -137,6 +169,64 @@ A bid qualifies for auto-payment when `bid_amount <= rfp.max_budget` and both to
 
 ---
 
+## agents/ — LangGraph Agent Reference
+
+All agents communicate with the Hub exclusively via HTTP (`httpx`). They never import `db.py` directly.
+
+### `buyer.py`
+
+**State:** `BuyerState` — `base_url`, `open_rfps`, `owner`, `should_post`, `rfp_id`
+
+**Graph:** `fetch_open_rfps → decide →(conditional)→ post_rfp → END`
+
+**Behaviour:** Posts at most one RFP per cycle. Only posts if no Open RFPs exist and `max_task_budget > 0`. Task spec is a hardcoded demo string for MVP.
+
+**Entry:** `run_buyer(base_url, poll_interval=15)` — async polling loop.
+
+---
+
+### `seller.py`
+
+**State:** `SellerState` — `base_url`, `open_rfps`, `profitable_rfps`, `bids_placed`
+
+**Graph:** `fetch_open_rfps → score_rfps → submit_bids → END`
+
+**Behaviour:** Bids at 85% of `max_budget` (15% margin). Skips RFPs already bid on by `seller-agent-01`. ETA capped at `min(deadline_seconds, 1800)`.
+
+**Identity:** `seller_id = "seller-agent-01"`, `seller_email` from `SELLER_EMAIL` env var.
+
+**Entry:** `run_seller(base_url, poll_interval=8)` — async polling loop.
+
+---
+
+### `assessor.py`
+
+**State:** `AssessorState` — `base_url`, `locked_rfps`, `current_rfp`, `delivery_note`, `llm_reasoning`, `verdict`
+
+**Graph:** `fetch_locked_rfps → pick_next →(conditional)→ reason → submit_verdict → pick_next (loop)`
+
+**Behaviour (ReAct):**
+1. Fetches all Locked RFPs
+2. Picks first one; uses `task_spec` as delivery note for demo (auto-PASS scenario)
+3. Calls Groq `llama3-8b-8192` — system prompt requests `{"verdict": "PASS"|"FAIL", "reasoning": "..."}` JSON
+4. Submits verdict to `POST /api/v1/verify`
+5. Loops to next Locked RFP until queue is empty
+
+**Override:** Set `FORCE_VERDICT=FAIL` to force all verdicts to FAIL (for testing dispute flow).
+
+**Entry:** `run_assessor(base_url, poll_interval=5)` — async polling loop.
+
+---
+
+### `runner.py`
+
+Runs all three agents with `asyncio.gather()`. Invoke with:
+```bash
+GROQ_API_KEY=... python -m backend.agents.runner
+```
+
+---
+
 ## templates/ — Template Notes
 
 All templates extend `base.html`. Tailwind CSS loaded from CDN. Custom status colors from `/static/css/dashboard.css`.
@@ -144,13 +234,15 @@ All templates extend `base.html`. Tailwind CSS loaded from CDN. Custom status co
 | Template | Key variables passed |
 |---|---|
 | `base.html` | Nav: Dashboard / Marketplace / Settings. Loads `locus-integration.js`. |
-| `dashboard.html` | `wallet_connected`, `owner`, `policy` |
+| `dashboard.html` | `wallet_connected`, `owner`, `policy`, `active_pacts` |
 | `settings.html` | `owner`, `policy` — form pre-fills from DB values |
 | `marketplace.html` | `rfps_with_bids` — list of `{rfp: dict, bids: list[dict]}` |
 
 `marketplace.html` has `data-refresh="true"` on the outer `<div>` — `locus-integration.js` detects this and calls `location.reload()` every 10 seconds.
 
-Status badges use `badge-{status|lower}` CSS class (e.g. `badge-verifying`, `badge-locked`).
+`dashboard.html` Active Pacts table loops over `active_pacts` (Locked/Completed/Disputed RFPs with accepted bid joined). Shows static empty state if list is empty.
+
+Status badges use `badge-{status|lower}` CSS class (e.g. `badge-verifying`, `badge-locked`, `badge-completed`, `badge-disputed`).
 
 ---
 
@@ -170,12 +262,9 @@ Status badges use `badge-{status|lower}` CSS class (e.g. `badge-verifying`, `bad
 
 ---
 
-## What is NOT yet built
+## What Is NOT Yet Built
 
-- **`POST /api/v1/verify`** — Assessor submits PASS/FAIL verdict
-  - PASS: call Locus to release funds to seller, set RFP → Completed
-  - FAIL: call Locus to cancel/refund, set RFP → Disputed
-- **Dashboard pacts feed** — currently shows static empty state; needs to pull from `rfps` table
 - **Agent authentication** — all endpoints are open; JWT / wallet-signature auth is planned
 - **Reputation gating** — `min_reputation` stored in RFP but not enforced on bid submission
-- **Assessor rotation** — no assignment logic yet; any agent can call verify
+- **Assessor rotation** — no assignment logic; any agent can call `/api/v1/verify`
+- **Seller fund claim** — Seller Agent detecting `Completed` status and calling Locus SDK to claim payment

@@ -2,9 +2,25 @@
 {% block title %}Dashboard — L-ESCROW{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-  <h1 class="text-2xl font-bold text-white mb-1">Command Center</h1>
-  <p class="text-gray-500 text-sm">Real-time view of agent activity and escrow state</p>
+<div class="mb-8 flex items-start justify-between gap-4">
+  <div>
+    <div class="flex items-center gap-3 mb-1">
+      <h1 class="text-2xl font-bold text-white">Command Center</h1>
+      {% if demo_mode %}
+        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">Demo Mode</span>
+      {% endif %}
+    </div>
+    <p class="text-gray-500 text-sm">Real-time view of agent activity and escrow state</p>
+    {% if demo_mode %}
+      <p class="text-amber-600 text-xs mt-1">Locus checkout sessions are real — payment confirmation is simulated. <a href="/marketplace" class="underline hover:text-amber-400">View checkout links →</a></p>
+    {% endif %}
+  </div>
+  {% if demo_mode %}
+    <button id="demo-btn" onclick="runDemo()"
+      class="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-black transition-colors">
+      Run Demo Cycle
+    </button>
+  {% endif %}
 </div>
 
 <!-- Wallet status card -->
@@ -63,15 +79,62 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td colspan="4" class="px-4 py-10 text-center text-gray-600 text-sm">
-            No active pacts —
-          <a href="/marketplace" class="text-amber-400 hover:underline">open the Marketplace</a>
-          to see agent activity.
-          </td>
-        </tr>
+        {% if active_pacts %}
+          {% for pact in active_pacts %}
+            {% set s = pact.status | lower %}
+            <tr class="border-t border-gray-800">
+              <td class="px-4 py-3 text-gray-200 text-sm truncate max-w-xs">{{ pact.task_spec }}</td>
+              <td class="px-4 py-3 text-gray-400 font-mono text-xs">
+                {% if pact.seller_id %}{{ pact.seller_id[:12] }}…{% else %}—{% endif %}
+              </td>
+              <td class="px-4 py-3 text-right text-white font-bold text-sm">
+                {% if pact.bid_amount %}{{ "%.2f"|format(pact.bid_amount) }} <span class="text-gray-500 font-normal text-xs">USDC</span>{% else %}—{% endif %}
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold text-white badge-{{ s }}">{{ pact.status }}</span>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="4" class="px-4 py-10 text-center text-gray-600 text-sm">
+              No active pacts —
+              <a href="/marketplace" class="text-amber-400 hover:underline">open the Marketplace</a>
+              to see agent activity.
+            </td>
+          </tr>
+        {% endif %}
       </tbody>
     </table>
   </div>
 </div>
+
+{% if demo_mode %}
+<script>
+async function runDemo() {
+  const btn = document.getElementById('demo-btn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  try {
+    const res = await fetch('/api/v1/demo/run', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Demo cycle started — watch the Marketplace!', 'success');
+      btn.textContent = 'Cycle Running';
+      // Open the real Locus checkout page so the audience sees the live session
+      if (data.checkout_url) window.open(data.checkout_url, '_blank', 'noopener');
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'Run Demo Cycle'; }, 12000);
+    } else {
+      showToast(data.error || 'Demo failed', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Run Demo Cycle';
+    }
+  } catch {
+    showToast('Could not reach server', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Run Demo Cycle';
+  }
+}
+</script>
+{% endif %}
 {% endblock %}

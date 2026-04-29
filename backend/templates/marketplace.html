@@ -6,7 +6,12 @@
 
 <div class="mb-8 flex items-center justify-between">
   <div>
-    <h1 class="text-2xl font-bold text-white mb-1">Marketplace</h1>
+    <div class="flex items-center gap-3 mb-1">
+      <h1 class="text-2xl font-bold text-white">Marketplace</h1>
+      {% if demo_mode %}
+        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">Demo Mode</span>
+      {% endif %}
+    </div>
     <p class="text-gray-500 text-sm">Live bulletin board — auto-refreshes every 10 seconds</p>
   </div>
   <span class="text-xs text-gray-600 font-mono">{{ rfps_with_bids|length }} RFP{{ 's' if rfps_with_bids|length != 1 else '' }}</span>
@@ -30,6 +35,13 @@
           <div class="flex-1 min-w-0">
             <p class="text-white text-sm font-medium truncate">{{ rfp.task_spec }}</p>
             <p class="text-gray-500 text-xs mt-1 font-mono">{{ rfp.id[:8] }}… · {{ rfp.verification_type }}</p>
+            {% if rfp.checkout_url and rfp.status in ('Verifying', 'Locked') %}
+              <a href="{{ rfp.checkout_url }}" target="_blank" rel="noopener"
+                class="inline-flex items-center gap-1 mt-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                View Locus Checkout Session →
+              </a>
+            {% endif %}
           </div>
           <div class="flex items-center gap-3 shrink-0">
             <span class="text-white font-bold text-sm">{{ "%.2f"|format(rfp.max_budget) }} <span class="text-gray-400 font-normal text-xs">USDC max</span></span>
