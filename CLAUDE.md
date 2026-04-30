@@ -13,7 +13,8 @@ A decentralized RFP (Request for Proposal) engine enabling Agent-to-Agent (A2A) 
 | 01   | Core Hub + Locus Checkout             | `feature/core-hub`        | ✅ Done |
 | 02   | Marketplace UI                        | `feature/marketplace`     | ✅ Done |
 | 03   | Agent Squad (Buyer, Seller, Assessor) | `feature/agent-squad`     | ✅ Done |
-| 04   | Multi-Model Consensus + Demo Mode     | `feature/model-consensus` | ✅ Done |
+| 04   | Multi-Model Consensus + Demo Mode     | `feature/model-consensus`    | ✅ Done |
+| 05   | Simulation Sandbox                    | `feature/simulation-sandbox` | ✅ Done |
 
 All feature branches have been merged to `main` and deleted.
 
