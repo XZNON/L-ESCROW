@@ -25,6 +25,36 @@ DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 BASE_DIR = Path(__file__).parent
 
 
+def _relative_time(dt_str: str | None) -> str:
+    if not dt_str:
+        return "never"
+    from datetime import datetime
+    delta = datetime.utcnow() - datetime.fromisoformat(dt_str)
+    s = int(delta.total_seconds())
+    if s < 60:    return f"{s}s ago"
+    if s < 3600:  return f"{s // 60}m ago"
+    if s < 86400: return f"{s // 3600}h ago"
+    return f"{s // 86400}d ago"
+
+
+def _enrich_agent(row: dict) -> dict:
+    parts = row["seller_id"].split("-")
+    tier = parts[1] if len(parts) >= 3 else "legacy"
+    if tier == "agent":
+        tier = "legacy"
+    bids_total = row["bids_total"] or 0
+    bids_won   = row["bids_won"]   or 0
+    return {
+        **row,
+        "tier": tier,
+        "status": "Generating" if row["is_generating"] else "Idle",
+        "bids_total": bids_total,
+        "bids_won": bids_won,
+        "win_rate": round(bids_won / bids_total * 100) if bids_total else 0,
+        "last_active": _relative_time(row["last_bid_at"]),
+    }
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
@@ -66,6 +96,22 @@ async def settings(request: Request):
         "settings.html",
         {"request": request, "owner": owner, "policy": policy},
     )
+
+
+# ── Agents page ──────────────────────────────────────────────────────────────
+
+@app.get("/agents")
+async def agents_page(request: Request):
+    agents = [_enrich_agent(r) for r in db.get_agent_stats()]
+    return templates.TemplateResponse(
+        "agents.html",
+        {"request": request, "agents": agents},
+    )
+
+
+@app.get("/api/v1/agents")
+async def list_agents():
+    return {"success": True, "agents": [_enrich_agent(r) for r in db.get_agent_stats()]}
 
 
 # ── Mandate API ───────────────────────────────────────────────────────────────

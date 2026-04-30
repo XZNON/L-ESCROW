@@ -315,6 +315,26 @@ def get_locked_rfps_for_seller(seller_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def get_agent_stats() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute("""
+            SELECT
+                b.seller_id,
+                COUNT(b.id)                                             AS bids_total,
+                SUM(CASE WHEN b.status = 'Accepted' THEN 1 ELSE 0 END) AS bids_won,
+                MAX(b.created_at)                                       AS last_bid_at,
+                EXISTS (
+                    SELECT 1 FROM rfps r
+                    WHERE r.assigned_seller_id = b.seller_id
+                      AND r.status = 'Locked'
+                )                                                       AS is_generating
+            FROM bids b
+            GROUP BY b.seller_id
+            ORDER BY bids_won DESC, last_bid_at DESC
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+
 # ── Sandbox helpers ───────────────────────────────────────────────────────────
 
 def get_completed_issue_ids() -> list[str]:
