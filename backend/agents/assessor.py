@@ -80,7 +80,7 @@ async def _call_groq(rfp: dict, delivery_note: str) -> tuple[str, str]:
 async def _call_gemma(rfp: dict, delivery_note: str) -> tuple[str, str]:
     try:
         chat = _groq_client.chat.completions.create(
-            model="gemma2-9b-it",
+            model="llama-3.3-70b-versatile",
             max_tokens=256,
             messages=[
                 {"role": "user", "content": (
@@ -93,7 +93,7 @@ async def _call_gemma(rfp: dict, delivery_note: str) -> tuple[str, str]:
         verdict = result.get("verdict", "FAIL")
         reasoning = result.get("reasoning", "")
     except Exception as e:
-        verdict, reasoning = "FAIL", f"Gemma error: {e}"
+        verdict, reasoning = "FAIL", f"Agent 2 error: {e}"
 
     if verdict not in ("PASS", "FAIL"):
         verdict = "FAIL"

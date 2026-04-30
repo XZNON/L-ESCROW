@@ -78,13 +78,13 @@ async def run_buyer(base_url: str, poll_interval: int = 15) -> None:
     while True:
         async with httpx.AsyncClient() as client:
             try:
-                resp = await client.get(f"{base_url}/api/v1/balance", timeout=10)
+                resp = await client.get(f"{base_url}/api/v1/owner", timeout=10)
                 owner_data = resp.json() if resp.status_code == 200 else {}
             except httpx.RequestError:
                 owner_data = {}
 
         owner = {
-            "max_task_budget": owner_data.get("balance", 0),
+            "max_task_budget": owner_data.get("max_task_budget") or 0,
         }
 
         await graph.ainvoke({

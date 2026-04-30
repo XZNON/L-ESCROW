@@ -110,6 +110,18 @@ async def save_mandate(body: MandateRequest):
     }
 
 
+@app.get("/api/v1/owner")
+async def get_owner_settings():
+    owner = db.get_owner()
+    policy = db.get_policy()
+    return {
+        "success": True,
+        "max_task_budget": owner.get("max_task_budget") or 0.0,
+        "daily_limit": owner.get("daily_limit") or 0.0,
+        "wallet_configured": bool(owner.get("locus_auth_token")),
+    }
+
+
 @app.get("/api/v1/balance")
 async def get_balance():
     owner = db.get_owner()
