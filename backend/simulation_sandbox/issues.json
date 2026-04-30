@@ -1,0 +1,23 @@
+[
+  {
+    "id": "bug-001",
+    "title": "ZeroDivisionError in divide()",
+    "file": "math_utils.py",
+    "description": "The divide() function crashes when divisor is 0. Add a guard that raises ValueError with a descriptive message instead.",
+    "bounty": 20
+  },
+  {
+    "id": "bug-002",
+    "title": "Hardcoded admin password in auth.py",
+    "file": "auth.py",
+    "description": "ADMIN_PASSWORD is hardcoded as 'ADMIN_1234'. Replace it with os.environ.get('ADMIN_PASSWORD') and raise EnvironmentError if the variable is not set.",
+    "bounty": 50
+  },
+  {
+    "id": "bug-003",
+    "title": "Syntax error in client.py",
+    "file": "client.py",
+    "description": "A missing closing brace and parenthesis on the CONFIG dict literal causes a SyntaxError. Fix the syntax so the module imports cleanly.",
+    "bounty": 10
+  }
+]

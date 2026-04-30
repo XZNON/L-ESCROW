@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Sandbox — L-ESCROW{% endblock %}
+
+{% block content %}
+<div data-refresh="true">
+
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-xl font-bold text-white">Simulation Sandbox</h1>
+      <p class="text-gray-500 text-sm mt-1">Mock-Git repo — auto-refreshes every 10 seconds</p>
+    </div>
+    <button
+      onclick="resetSandbox()"
+      class="px-4 py-2 text-sm bg-red-900/40 border border-red-800 text-red-300 rounded hover:bg-red-900/70 transition-colors"
+    >
+      Reset Sandbox
+    </button>
+  </div>
+
+  {% if not file_cards %}
+    <p class="text-gray-500 text-sm">No issues found. Check that issues.json exists in backend/simulation_sandbox/.</p>
+  {% endif %}
+
+  <div class="flex flex-col gap-6">
+    {% for card in file_cards %}
+    <div class="border border-gray-800 rounded-lg overflow-hidden">
+
+      <!-- Card header -->
+      <div class="flex items-center justify-between px-4 py-3 bg-gray-900/60 border-b border-gray-800">
+        <div class="flex items-center gap-3">
+          <span class="text-amber-400 font-bold text-sm font-mono">{{ card.issue.file }}</span>
+          <span class="text-gray-500 text-sm">{{ card.issue.title }}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400">{{ card.issue.bounty }} USDC</span>
+          {% if card.resolved %}
+            <span class="badge-completed px-2 py-0.5 rounded-full text-xs font-semibold text-white">Fixed</span>
+          {% else %}
+            <span class="badge-disputed px-2 py-0.5 rounded-full text-xs font-semibold text-white">Broken</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Current repo file -->
+      <div class="p-4">
+        <p class="text-xs text-gray-500 mb-2 uppercase tracking-wider">repo/{{ card.issue.file }}</p>
+        <pre class="text-xs text-gray-300 bg-gray-950 border border-gray-800 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ card.content }}</pre>
+      </div>
+
+      <!-- Unified diff (if PR exists) -->
+      {% if card.diff %}
+      <div class="px-4 pb-4">
+        <p class="text-xs text-gray-500 mb-2 uppercase tracking-wider">Proposed fix (diff)</p>
+        <pre class="text-xs bg-gray-950 border border-gray-800 rounded p-3 overflow-x-auto whitespace-pre-wrap">{% for line in card.diff.splitlines() %}{% if line.startswith('+') and not line.startswith('+++') %}<span class="text-green-400">{{ line }}</span>
+{% elif line.startswith('-') and not line.startswith('---') %}<span class="text-red-400">{{ line }}</span>
+{% elif line.startswith('@@') %}<span class="text-blue-400">{{ line }}</span>
+{% else %}<span class="text-gray-500">{{ line }}</span>
+{% endif %}{% endfor %}</pre>
+      </div>
+      {% elif card.active_rfp_id and not card.resolved %}
+      <div class="px-4 pb-4">
+        <p class="text-xs text-gray-600 italic">Waiting for Seller Agent to submit fix…</p>
+      </div>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<script>
+async function resetSandbox() {
+  try {
+    const resp = await fetch('/api/v1/sandbox/reset', { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      showToast('Sandbox reset — repo restored to broken state', 'success');
+      setTimeout(() => location.reload(), 800);
+    } else {
+      showToast('Reset failed', 'error');
+    }
+  } catch (e) {
+    showToast('Reset failed: ' + e.message, 'error');
+  }
+}
+</script>
+{% endblock %}

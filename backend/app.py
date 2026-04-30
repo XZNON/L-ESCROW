@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from backend.database import db
+from backend.simulation_sandbox.manager import sim_manager
 
 import os
 
@@ -167,6 +168,8 @@ class RFPRequest(BaseModel):
     deadline_seconds: int
     min_reputation: float = 0.0
     verification_type: str = "manual"
+    issue_id: Optional[str] = None
+    sandbox_file: Optional[str] = None
 
 
 class BidRequest(BaseModel):
@@ -183,6 +186,7 @@ async def create_rfp(body: RFPRequest):
     db.create_rfp(
         rfp_id, body.buyer_id, body.task_spec, body.max_budget,
         body.deadline_seconds, body.min_reputation, body.verification_type,
+        issue_id=body.issue_id, sandbox_file=body.sandbox_file,
     )
     return {"success": True, "rfp_id": rfp_id}
 
@@ -367,6 +371,8 @@ async def verify_rfp(body: VerifyRequest):
 
     if body.verdict == "PASS":
         db.complete_rfp(body.rfp_id, body.assessor_id, "PASS")
+        if rfp.get("sandbox_file"):
+            sim_manager.merge_fix(body.rfp_id, rfp["sandbox_file"])
         return {"success": True, "status": "Completed", "verdict": "PASS"}
 
     # FAIL path — mark disputed then attempt Locus cancel
@@ -555,6 +561,52 @@ async def demo_run(background_tasks: BackgroundTasks):
         "checkout_url": checkout_url,
         "message": "Demo cycle started — real Locus session created, payment simulates in 4s, Assessor will verify via LLM.",
     }
+
+
+# ── Simulation Sandbox ───────────────────────────────────────────────────────
+
+@app.get("/sandbox")
+async def sandbox_page(request: Request):
+    issues = sim_manager.get_issues()
+    completed_ids = set(db.get_completed_issue_ids())
+    active_rfps = db.get_active_sandbox_rfps()
+    active_map = {r["issue_id"]: r["id"] for r in active_rfps}
+
+    file_cards = []
+    for issue in issues:
+        rfp_id = active_map.get(issue["id"])
+        content = sim_manager.read_repo_file(issue["file"])
+        diff = sim_manager.get_diff(issue["file"], rfp_id) if rfp_id else ""
+        file_cards.append({
+            "issue": issue,
+            "resolved": issue["id"] in completed_ids,
+            "content": content,
+            "diff": diff,
+            "active_rfp_id": rfp_id,
+        })
+
+    return templates.TemplateResponse(
+        "sandbox.html",
+        {"request": request, "file_cards": file_cards},
+    )
+
+
+@app.post("/api/v1/sandbox/reset")
+async def sandbox_reset():
+    sim_manager.reset_sandbox()
+    return {"success": True}
+
+
+@app.get("/api/v1/sandbox/issues")
+async def sandbox_issues():
+    issues = sim_manager.get_issues()
+    completed_ids = set(db.get_completed_issue_ids())
+    active_rfps = db.get_active_sandbox_rfps()
+    active_map = {r["issue_id"]: r["id"] for r in active_rfps}
+    for issue in issues:
+        issue["resolved"] = issue["id"] in completed_ids
+        issue["active_rfp_id"] = active_map.get(issue["id"])
+    return {"success": True, "issues": issues}
 
 
 # ── Debug ────────────────────────────────────────────────────────────────────

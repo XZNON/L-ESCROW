@@ -1,6 +1,8 @@
 import asyncio
+import difflib
 import json
 import os
+from pathlib import Path
 from typing import TypedDict
 
 import groq
@@ -10,6 +12,7 @@ from langgraph.graph import END, StateGraph
 ASSESSOR_ID = "assessor-agent-01"
 FORCE_VERDICT_A = os.getenv("FORCE_VERDICT_A", "")
 FORCE_VERDICT_B = os.getenv("FORCE_VERDICT_B", "")
+SIMULATION_PATH = Path(os.getenv("SIMULATION_PATH", str(Path(__file__).parent.parent / "simulation_sandbox")))
 
 _groq_client = groq.Groq()
 
@@ -19,17 +22,41 @@ _SYSTEM_PROMPT = (
     'Respond with ONLY valid JSON: {"verdict": "PASS" or "FAIL", "reasoning": "<one sentence>"}'
 )
 
+_CODE_REVIEW_SYSTEM = (
+    "You are an impartial code reviewer. Review the proposed fix and decide if it correctly resolves the reported bug. "
+    'Respond ONLY with valid JSON: {"verdict": "PASS" or "FAIL", "reasoning": "<one sentence>"}'
+)
+
 
 class AssessorState(TypedDict):
     base_url: str
     locked_rfps: list
     current_rfp: dict | None
     delivery_note: str
+    original_code: str
+    proposed_code: str
+    unified_diff: str
     verdict_a: str | None
     reasoning_a: str
     verdict_b: str | None
     reasoning_b: str
     conflict: bool
+
+
+def _build_diff(rfp_id: str, sandbox_file: str) -> tuple[str, str, str]:
+    repo_file = SIMULATION_PATH / "repo" / sandbox_file
+    original = repo_file.read_text(encoding="utf-8") if repo_file.exists() else ""
+    pr_matches = list((SIMULATION_PATH / "prs").glob(f"pr_*_{rfp_id}.py"))
+    if not pr_matches:
+        return original, "", ""
+    proposed = pr_matches[0].read_text(encoding="utf-8")
+    diff = "".join(difflib.unified_diff(
+        original.splitlines(keepends=True),
+        proposed.splitlines(keepends=True),
+        fromfile=f"repo/{sandbox_file}",
+        tofile=f"prs/{pr_matches[0].name}",
+    ))
+    return original, proposed, diff
 
 
 async def fetch_locked_rfps(state: AssessorState) -> AssessorState:
@@ -48,23 +75,53 @@ async def fetch_locked_rfps(state: AssessorState) -> AssessorState:
 
 async def pick_next(state: AssessorState) -> AssessorState:
     rfp = state["locked_rfps"][0] if state["locked_rfps"] else None
-    delivery_note = (
-        f"Work completed as specified. Delivered: {rfp['task_spec']} — "
-        "all requirements met, tested, and ready for review."
-    ) if rfp else ""
-    return {**state, "current_rfp": rfp, "delivery_note": delivery_note,
-            "verdict_a": None, "verdict_b": None, "reasoning_a": "", "reasoning_b": "", "conflict": False}
+
+    original_code = proposed_code = unified_diff = ""
+    delivery_note = ""
+
+    if rfp:
+        if rfp.get("sandbox_file"):
+            original_code, proposed_code, unified_diff = _build_diff(rfp["id"], rfp["sandbox_file"])
+            if unified_diff:
+                print(f"[assessor] Diff ready for {rfp['sandbox_file']} ({len(unified_diff)} chars)")
+            else:
+                print(f"[assessor] No PR file found for RFP {rfp['id'][:8]} — waiting for Seller fix")
+        delivery_note = (
+            f"Work completed as specified. Delivered: {rfp['task_spec']} — "
+            "all requirements met, tested, and ready for review."
+        )
+
+    return {
+        **state,
+        "current_rfp": rfp,
+        "delivery_note": delivery_note,
+        "original_code": original_code,
+        "proposed_code": proposed_code,
+        "unified_diff": unified_diff,
+        "verdict_a": None,
+        "verdict_b": None,
+        "reasoning_a": "",
+        "reasoning_b": "",
+        "conflict": False,
+    }
 
 
-async def _call_groq(rfp: dict, delivery_note: str) -> tuple[str, str]:
+async def _call_groq(rfp: dict, delivery_note: str, unified_diff: str) -> tuple[str, str]:
     try:
+        if unified_diff:
+            messages = [
+                {"role": "system", "content": _CODE_REVIEW_SYSTEM},
+                {"role": "user", "content": f"Bug report: {rfp['task_spec']}\n\nProposed fix (unified diff):\n{unified_diff}"},
+            ]
+        else:
+            messages = [
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": f"Task spec: {rfp['task_spec']}\nDelivery note: {delivery_note}"},
+            ]
         chat = _groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=256,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": f"Task spec: {rfp['task_spec']}\nDelivery note: {delivery_note}"},
-            ],
+            messages=messages,
         )
         result = json.loads(chat.choices[0].message.content)
         verdict = result.get("verdict", "FAIL")
@@ -77,23 +134,28 @@ async def _call_groq(rfp: dict, delivery_note: str) -> tuple[str, str]:
     return verdict, reasoning
 
 
-async def _call_gemma(rfp: dict, delivery_note: str) -> tuple[str, str]:
+async def _call_gemma(rfp: dict, delivery_note: str, unified_diff: str) -> tuple[str, str]:
     try:
+        if unified_diff:
+            content = (
+                f"{_CODE_REVIEW_SYSTEM}\n\n"
+                f"Bug report: {rfp['task_spec']}\n\nProposed fix (unified diff):\n{unified_diff}"
+            )
+        else:
+            content = (
+                f"{_SYSTEM_PROMPT}\n\n"
+                f"Task spec: {rfp['task_spec']}\nDelivery note: {delivery_note}"
+            )
         chat = _groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=256,
-            messages=[
-                {"role": "user", "content": (
-                    f"{_SYSTEM_PROMPT}\n\n"
-                    f"Task spec: {rfp['task_spec']}\nDelivery note: {delivery_note}"
-                )},
-            ],
+            messages=[{"role": "user", "content": content}],
         )
         result = json.loads(chat.choices[0].message.content)
         verdict = result.get("verdict", "FAIL")
         reasoning = result.get("reasoning", "")
     except Exception as e:
-        verdict, reasoning = "FAIL", f"Agent 2 error: {e}"
+        verdict, reasoning = "FAIL", f"Gemma error: {e}"
 
     if verdict not in ("PASS", "FAIL"):
         verdict = "FAIL"
@@ -108,10 +170,11 @@ async def reason_judges(state: AssessorState) -> AssessorState:
                 "verdict_b": FORCE_VERDICT_B, "reasoning_b": "Forced via FORCE_VERDICT_B env var."}
 
     rfp = state["current_rfp"]
-    print(f"[assessor] Calling Judge A (Llama 3.3) and Judge B (Gemma 2) concurrently for RFP {rfp['id'][:8]}…")
+    mode = "code-diff" if state["unified_diff"] else "delivery-note"
+    print(f"[assessor] Calling Judge A (Llama 3.3) and Judge B (Gemma 2) concurrently for RFP {rfp['id'][:8]} [{mode}]…")
     (va, ra), (vb, rb) = await asyncio.gather(
-        _call_groq(rfp, state["delivery_note"]),
-        _call_gemma(rfp, state["delivery_note"]),
+        _call_groq(rfp, state["delivery_note"], state["unified_diff"]),
+        _call_gemma(rfp, state["delivery_note"], state["unified_diff"]),
     )
     print(f"[assessor] Judge A (Llama 3.3): {va} | Judge B (Gemma 2): {vb}")
     return {**state, "verdict_a": va, "reasoning_a": ra, "verdict_b": vb, "reasoning_b": rb}
@@ -169,7 +232,12 @@ async def report_conflict(state: AssessorState) -> AssessorState:
 
 
 def _route_after_pick(state: AssessorState) -> str:
-    return "reason_judges" if state["current_rfp"] else END
+    if not state["current_rfp"]:
+        return END
+    # If sandbox RFP but no PR file yet, skip this cycle — Seller hasn't written the fix yet
+    if state["current_rfp"].get("sandbox_file") and not state["unified_diff"]:
+        return END
+    return "reason_judges"
 
 
 def _route_after_consensus(state: AssessorState) -> str:
@@ -202,6 +270,9 @@ async def run_assessor(base_url: str, poll_interval: int = 5) -> None:
             "locked_rfps": [],
             "current_rfp": None,
             "delivery_note": "",
+            "original_code": "",
+            "proposed_code": "",
+            "unified_diff": "",
             "verdict_a": None,
             "reasoning_a": "",
             "verdict_b": None,

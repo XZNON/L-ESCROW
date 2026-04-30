@@ -1,13 +1,16 @@
 import asyncio
 import os
+from pathlib import Path
 from typing import TypedDict
 
 import httpx
+from groq import Groq
 from langgraph.graph import END, StateGraph
 
 SELLER_ID = "seller-agent-01"
 SELLER_EMAIL = os.getenv("SELLER_EMAIL", "seller@lescrow.dev")
 MARGIN = 0.85  # bid at 85% of max_budget (15% headroom)
+SIMULATION_PATH = Path(os.getenv("SIMULATION_PATH", str(Path(__file__).parent.parent / "simulation_sandbox")))
 
 
 class SellerState(TypedDict):
@@ -15,6 +18,51 @@ class SellerState(TypedDict):
     open_rfps: list
     profitable_rfps: list
     bids_placed: list
+
+
+def _generate_fix(rfp: dict) -> None:
+    sandbox_file = rfp.get("sandbox_file")
+    if not sandbox_file:
+        return
+
+    repo_file = SIMULATION_PATH / "repo" / sandbox_file
+    if not repo_file.exists():
+        print(f"[Seller] sandbox file not found: {repo_file}")
+        return
+
+    broken_code = repo_file.read_text(encoding="utf-8")
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        print("[Seller] GROQ_API_KEY not set — skipping fix generation")
+        return
+
+    client = Groq(api_key=api_key)
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert Python developer. Return ONLY the fixed Python source code. No markdown fences, no explanation, no comments about the fix.",
+                },
+                {
+                    "role": "user",
+                    "content": f"Bug report: {rfp['task_spec']}\n\nBroken code:\n{broken_code}\n\nReturn only the complete fixed Python file.",
+                },
+            ],
+            max_tokens=1024,
+        )
+        fixed_code = response.choices[0].message.content.strip()
+        # Strip accidental markdown fences if model ignores instructions
+        if fixed_code.startswith("```"):
+            lines = fixed_code.splitlines()
+            fixed_code = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+
+        pr_path = SIMULATION_PATH / "prs" / f"pr_{SELLER_ID}_{rfp['id']}.py"
+        pr_path.write_text(fixed_code, encoding="utf-8")
+        print(f"[Seller] Fix written to {pr_path.name}")
+    except Exception as e:
+        print(f"[Seller] Fix generation failed for {sandbox_file}: {e}")
 
 
 async def fetch_open_rfps(state: SellerState) -> SellerState:
@@ -70,6 +118,10 @@ async def submit_bids(state: SellerState) -> SellerState:
                 )
                 if resp.status_code == 200:
                     placed.append(rfp["id"])
+                    print(f"[Seller] Bid placed on RFP {rfp['id'][:8]}")
+                    # Generate code fix for sandbox RFPs
+                    if rfp.get("sandbox_file"):
+                        _generate_fix(rfp)
             except httpx.RequestError:
                 continue
 

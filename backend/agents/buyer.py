@@ -1,5 +1,4 @@
 import asyncio
-import uuid
 from typing import TypedDict
 
 import httpx
@@ -8,90 +7,69 @@ from langgraph.graph import END, StateGraph
 
 class BuyerState(TypedDict):
     base_url: str
-    open_rfps: list
-    owner: dict
-    should_post: bool
-    rfp_id: str | None
+    sandbox_issues: list
+    posted_count: int
 
 
-async def fetch_open_rfps(state: BuyerState) -> BuyerState:
+async def fetch_sandbox_issues(state: BuyerState) -> BuyerState:
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(
-                f"{state['base_url']}/api/v1/rfps",
-                params={"status": "Open"},
+                f"{state['base_url']}/api/v1/sandbox/issues",
                 timeout=10,
             )
-            rfps = resp.json().get("rfps", []) if resp.status_code == 200 else []
+            issues = resp.json().get("issues", []) if resp.status_code == 200 else []
         except httpx.RequestError:
-            rfps = []
-    return {**state, "open_rfps": rfps}
+            issues = []
+    # Only keep issues that are unresolved and have no active RFP
+    pending = [i for i in issues if not i.get("resolved") and not i.get("active_rfp_id")]
+    return {**state, "sandbox_issues": pending}
 
 
-async def decide(state: BuyerState) -> BuyerState:
-    owner = state["owner"]
-    budget = owner.get("max_task_budget", 0)
-    should_post = len(state["open_rfps"]) == 0 and budget > 0
-    return {**state, "should_post": should_post}
-
-
-async def post_rfp(state: BuyerState) -> BuyerState:
-    owner = state["owner"]
-    rfp_id = str(uuid.uuid4())
+async def post_pending_rfps(state: BuyerState) -> BuyerState:
+    posted = 0
     async with httpx.AsyncClient() as client:
-        try:
-            await client.post(
-                f"{state['base_url']}/api/v1/rfp",
-                json={
-                    "buyer_id": "buyer-agent-01",
-                    "task_spec": "Summarise the latest AI research papers from arxiv.org into a 500-word brief.",
-                    "max_budget": owner.get("max_task_budget", 1.0),
-                    "deadline_seconds": 3600,
-                    "min_reputation": 0.0,
-                    "verification_type": "llm",
-                },
-                timeout=10,
-            )
-        except httpx.RequestError:
-            rfp_id = None
-    return {**state, "rfp_id": rfp_id}
-
-
-def _route_after_decide(state: BuyerState) -> str:
-    return "post_rfp" if state["should_post"] else END
+        for issue in state["sandbox_issues"]:
+            try:
+                resp = await client.post(
+                    f"{state['base_url']}/api/v1/rfp",
+                    json={
+                        "buyer_id": "buyer-agent-01",
+                        "task_spec": issue["description"],
+                        "max_budget": float(issue["bounty"]),
+                        "deadline_seconds": 3600,
+                        "min_reputation": 0.0,
+                        "verification_type": "llm",
+                        "issue_id": issue["id"],
+                        "sandbox_file": issue["file"],
+                    },
+                    timeout=10,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    print(f"[Buyer] Posted RFP {data.get('rfp_id', '?')[:8]} for issue {issue['id']}: {issue['title']}")
+                    posted += 1
+            except httpx.RequestError:
+                pass
+    return {**state, "posted_count": posted}
 
 
 def build_buyer_graph() -> StateGraph:
     g = StateGraph(BuyerState)
-    g.add_node("fetch_open_rfps", fetch_open_rfps)
-    g.add_node("decide", decide)
-    g.add_node("post_rfp", post_rfp)
-    g.set_entry_point("fetch_open_rfps")
-    g.add_edge("fetch_open_rfps", "decide")
-    g.add_conditional_edges("decide", _route_after_decide)
-    g.add_edge("post_rfp", END)
+    g.add_node("fetch_sandbox_issues", fetch_sandbox_issues)
+    g.add_node("post_pending_rfps", post_pending_rfps)
+    g.set_entry_point("fetch_sandbox_issues")
+    g.add_edge("fetch_sandbox_issues", "post_pending_rfps")
+    g.add_edge("post_pending_rfps", END)
     return g.compile()
 
 
 async def run_buyer(base_url: str, poll_interval: int = 15) -> None:
     graph = build_buyer_graph()
     while True:
-        async with httpx.AsyncClient() as client:
-            try:
-                resp = await client.get(f"{base_url}/api/v1/owner", timeout=10)
-                owner_data = resp.json() if resp.status_code == 200 else {}
-            except httpx.RequestError:
-                owner_data = {}
-
-        owner = {
-            "max_task_budget": owner_data.get("max_task_budget") or 0,
-        }
-
         await graph.ainvoke({
             "base_url": base_url,
-            "open_rfps": [],
-            "owner": owner,
-            "should_post": False,
-            "rfp_id": None,
+            "sandbox_issues": [],
+            "posted_count": 0,
         })
         await asyncio.sleep(poll_interval)

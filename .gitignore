@@ -1,1 +1,8 @@
 locusAPI.txt
+backend/simulation_sandbox/repo/
+backend/simulation_sandbox/prs/*.py
+__pycache__/
+*.pyc
+lescrow.db
+
+.env

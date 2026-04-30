@@ -72,6 +72,8 @@ def init_db() -> None:
             "ALTER TABLE rfps ADD COLUMN judge_b_verdict TEXT",
             "ALTER TABLE rfps ADD COLUMN judge_b_reasoning TEXT",
             "ALTER TABLE rfps ADD COLUMN conflict_notes TEXT",
+            "ALTER TABLE rfps ADD COLUMN issue_id TEXT",
+            "ALTER TABLE rfps ADD COLUMN sandbox_file TEXT",
         ]:
             try:
                 conn.execute(migration)
@@ -130,13 +132,14 @@ def update_policy(required_assessor_score: float, allowed_service_types: list) -
 def create_rfp(
     id: str, buyer_id: str, task_spec: str, max_budget: float,
     deadline_seconds: int, min_reputation: float, verification_type: str,
+    *, issue_id: str | None = None, sandbox_file: str | None = None,
 ) -> None:
     with _connect() as conn:
         conn.execute(
             """INSERT INTO rfps
-               (id, buyer_id, task_spec, max_budget, deadline_seconds, min_reputation, verification_type)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (id, buyer_id, task_spec, max_budget, deadline_seconds, min_reputation, verification_type),
+               (id, buyer_id, task_spec, max_budget, deadline_seconds, min_reputation, verification_type, issue_id, sandbox_file)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, buyer_id, task_spec, max_budget, deadline_seconds, min_reputation, verification_type, issue_id, sandbox_file),
         )
 
 
@@ -298,3 +301,23 @@ def dispute_rfp(rfp_id: str, assessor_id: str, verdict: str) -> None:
                WHERE id = ?""",
             (assessor_id, verdict, rfp_id),
         )
+
+
+# ── Sandbox helpers ───────────────────────────────────────────────────────────
+
+def get_completed_issue_ids() -> list[str]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT issue_id FROM rfps WHERE status = 'Completed' AND issue_id IS NOT NULL"
+        ).fetchall()
+        return [r["issue_id"] for r in rows]
+
+
+def get_active_sandbox_rfps() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT issue_id, id, status FROM rfps
+               WHERE issue_id IS NOT NULL
+               AND status NOT IN ('Completed', 'Disputed')"""
+        ).fetchall()
+        return [dict(r) for r in rows]

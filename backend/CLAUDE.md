@@ -13,6 +13,7 @@ All server-side code: FastAPI application, SQLite database layer, Jinja2 templat
 All routes are registered in `backend/app.py`. No route files or routers — everything is in one file.
 
 Key module-level constants:
+
 ```python
 LOCUS_API_BASE   = "https://beta-api.paywithlocus.com/api"
 CHECKOUT_BASE_URL = "https://checkout.paywithlocus.com"   # NOT the beta subdomain
@@ -21,28 +22,28 @@ DEMO_MODE        = os.getenv("DEMO_MODE", "false").lower() == "true"
 
 ### Page routes (Jinja2 templates)
 
-| Route | Template | Purpose |
-|---|---|---|
-| `GET /` | `dashboard.html` | Wallet status, balance card, live active pacts feed, Demo Mode button |
-| `GET /settings` | `settings.html` | Mandate form — buyer key, merchant key, budgets |
+| Route              | Template           | Purpose                                                                   |
+| ------------------ | ------------------ | ------------------------------------------------------------------------- |
+| `GET /`            | `dashboard.html`   | Wallet status, balance card, live active pacts feed, Demo Mode button     |
+| `GET /settings`    | `settings.html`    | Mandate form — buyer key, merchant key, budgets                           |
 | `GET /marketplace` | `marketplace.html` | Live RFP bulletin board with bids and checkout links (auto-refreshes 10s) |
 
 ### API routes
 
-| Route | Auth | Description |
-|---|---|---|
-| `POST /api/v1/mandate` | — | Save buyer + merchant Locus keys, validate both against `/pay/balance` |
-| `GET /api/v1/balance` | — | Proxy buyer `usdc_balance` from Locus (field name is `usdc_balance`, not `balance`) |
-| `POST /api/v1/rfp` | — | Create new RFP (Open status) |
-| `POST /api/v1/bid` | — | Submit bid; triggers full Locus Checkout flow (or demo confirm if DEMO_MODE) |
-| `GET /api/v1/rfps` | — | List RFPs, optional `?status=` filter |
-| `GET /api/v1/rfps/{rfp_id}/bids` | — | List bids for one RFP |
-| `POST /api/v1/verify` | — | Assessor unanimous verdict; PASS→Completed, FAIL→Disputed + Locus cancel |
-| `POST /api/v1/report-conflict` | — | Assessor split verdict (Locked→Conflict); stores both judges' reasoning |
-| `POST /api/v1/settle-conflict` | — | Human owner resolves Conflict: PASS→Completed or FAIL→Disputed + cancel |
-| `POST /api/v1/demo/run` | — | (DEMO_MODE only) Creates real Locus session + full RFP/bid cycle, PAID in 4s |
-| `POST /api/v1/webhook/locus` | HMAC | Locus event receiver — `checkout.session.paid` |
-| `GET /api/v1/debug/payment/{tx_id}` | — | Dev tool — inspect Locus transaction |
+| Route                               | Auth | Description                                                                         |
+| ----------------------------------- | ---- | ----------------------------------------------------------------------------------- |
+| `POST /api/v1/mandate`              | —    | Save buyer + merchant Locus keys, validate both against `/pay/balance`              |
+| `GET /api/v1/balance`               | —    | Proxy buyer `usdc_balance` from Locus (field name is `usdc_balance`, not `balance`) |
+| `POST /api/v1/rfp`                  | —    | Create new RFP (Open status)                                                        |
+| `POST /api/v1/bid`                  | —    | Submit bid; triggers full Locus Checkout flow (or demo confirm if DEMO_MODE)        |
+| `GET /api/v1/rfps`                  | —    | List RFPs, optional `?status=` filter                                               |
+| `GET /api/v1/rfps/{rfp_id}/bids`    | —    | List bids for one RFP                                                               |
+| `POST /api/v1/verify`               | —    | Assessor unanimous verdict; PASS→Completed, FAIL→Disputed + Locus cancel            |
+| `POST /api/v1/report-conflict`      | —    | Assessor split verdict (Locked→Conflict); stores both judges' reasoning             |
+| `POST /api/v1/settle-conflict`      | —    | Human owner resolves Conflict: PASS→Completed or FAIL→Disputed + cancel             |
+| `POST /api/v1/demo/run`             | —    | (DEMO_MODE only) Creates real Locus session + full RFP/bid cycle, PAID in 4s        |
+| `POST /api/v1/webhook/locus`        | HMAC | Locus event receiver — `checkout.session.paid`                                      |
+| `GET /api/v1/debug/payment/{tx_id}` | —    | Dev tool — inspect Locus transaction                                                |
 
 ### Pydantic request models
 
@@ -62,6 +63,7 @@ SettleRequest    # rfp_id, verdict ("PASS"|"FAIL")
 This is the most complex part of the codebase. Understand this before touching it.
 
 ### Two Locus accounts
+
 - `locus_auth_token` — **buyer** account; pays sessions autonomously
 - `merchant_locus_token` — **merchant** account; creates sessions, receives payment
 
@@ -93,6 +95,7 @@ A bid qualifies when `bid_amount <= rfp.max_budget` and both tokens are configur
 ```
 
 ### Critical gotchas
+
 - `checkoutUrl` is extracted from the session creation response — **never constructed manually**. The beta checkout domain (`checkout.beta.paywithlocus.com`) does not resolve; the correct domain is `checkout.paywithlocus.com`.
 - **Do not poll** `GET /checkout/agent/payments/{transactionId}` — returns 403 for cross-account transactions. Always poll the session endpoint instead.
 - `db.set_rfp_verifying()` is called **before** any pay call so the DB is consistent even if the server crashes mid-flight.
@@ -135,50 +138,56 @@ settle-conflict (Human owner via dashboard UI):
 ## database/db.py — Function Reference
 
 ### Owner / Policy
-| Function | Description |
-|---|---|
-| `init_db()` | Create all tables, run migrations, seed id=1 rows |
-| `get_owner() -> dict` | Single-row owner record |
-| `update_mandate(token, merchant_token, max_budget, daily_limit)` | Persist both Locus keys |
-| `get_policy() -> dict` | Single-row policy record |
-| `update_policy(required_assessor_score, allowed_service_types)` | Update policy |
+
+| Function                                                         | Description                                       |
+| ---------------------------------------------------------------- | ------------------------------------------------- |
+| `init_db()`                                                      | Create all tables, run migrations, seed id=1 rows |
+| `get_owner() -> dict`                                            | Single-row owner record                           |
+| `update_mandate(token, merchant_token, max_budget, daily_limit)` | Persist both Locus keys                           |
+| `get_policy() -> dict`                                           | Single-row policy record                          |
+| `update_policy(required_assessor_score, allowed_service_types)`  | Update policy                                     |
 
 ### RFPs
-| Function | Description |
-|---|---|
-| `create_rfp(id, buyer_id, task_spec, max_budget, deadline_seconds, min_reputation, verification_type)` | Insert new RFP |
-| `get_rfps(status=None) -> list[dict]` | All RFPs, optional status filter |
-| `get_rfp(rfp_id) -> dict\|None` | Single RFP by id |
-| `get_rfp_by_session(session_id) -> dict\|None` | Webhook lookup by Locus session id |
-| `set_rfp_verifying(rfp_id, session_id, webhook_secret, bid_id, checkout_url="")` | Transition to Verifying; stores checkout_url |
-| `revert_rfp_to_open(rfp_id)` | Rollback on payment failure — clears session, resets bid to Pending |
-| `get_locked_rfps() -> list[dict]` | All Locked RFPs — used by Assessor Agent polling |
-| `get_active_pacts() -> list[dict]` | Locked/Completed/Disputed/**Conflict** RFPs joined with accepted bid — includes all judge columns |
-| `complete_rfp(rfp_id, assessor_id, verdict)` | Transition → Completed, record assessor + timestamp |
-| `dispute_rfp(rfp_id, assessor_id, verdict)` | Transition → Disputed, record assessor + timestamp |
-| `conflict_rfp(rfp_id, verdict_a, reasoning_a, verdict_b, reasoning_b)` | **NEW** — Transition Locked → Conflict, store both judges |
-| `settle_conflict(rfp_id, assessor_id, verdict)` | **NEW** — PASS delegates to complete_rfp, FAIL to dispute_rfp |
+
+| Function                                                                                               | Description                                                                                       |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `create_rfp(id, buyer_id, task_spec, max_budget, deadline_seconds, min_reputation, verification_type)` | Insert new RFP                                                                                    |
+| `get_rfps(status=None) -> list[dict]`                                                                  | All RFPs, optional status filter                                                                  |
+| `get_rfp(rfp_id) -> dict\|None`                                                                        | Single RFP by id                                                                                  |
+| `get_rfp_by_session(session_id) -> dict\|None`                                                         | Webhook lookup by Locus session id                                                                |
+| `set_rfp_verifying(rfp_id, session_id, webhook_secret, bid_id, checkout_url="")`                       | Transition to Verifying; stores checkout_url                                                      |
+| `revert_rfp_to_open(rfp_id)`                                                                           | Rollback on payment failure — clears session, resets bid to Pending                               |
+| `get_locked_rfps() -> list[dict]`                                                                      | All Locked RFPs — used by Assessor Agent polling                                                  |
+| `get_active_pacts() -> list[dict]`                                                                     | Locked/Completed/Disputed/**Conflict** RFPs joined with accepted bid — includes all judge columns |
+| `complete_rfp(rfp_id, assessor_id, verdict)`                                                           | Transition → Completed, record assessor + timestamp                                               |
+| `dispute_rfp(rfp_id, assessor_id, verdict)`                                                            | Transition → Disputed, record assessor + timestamp                                                |
+| `conflict_rfp(rfp_id, verdict_a, reasoning_a, verdict_b, reasoning_b)`                                 | **NEW** — Transition Locked → Conflict, store both judges                                         |
+| `settle_conflict(rfp_id, assessor_id, verdict)`                                                        | **NEW** — PASS delegates to complete_rfp, FAIL to dispute_rfp                                     |
 
 ### Bids
-| Function | Description |
-|---|---|
-| `create_bid(id, rfp_id, seller_id, seller_email, bid_amount, eta_seconds)` | Insert new bid |
-| `get_bids_for_rfp(rfp_id) -> list[dict]` | All bids for an RFP |
-| `accept_bid(bid_id, rfp_id, session_id, transaction_id)` | Atomic: RFP→Locked, bid→Accepted, rest→Rejected |
+
+| Function                                                                   | Description                                     |
+| -------------------------------------------------------------------------- | ----------------------------------------------- |
+| `create_bid(id, rfp_id, seller_id, seller_email, bid_amount, eta_seconds)` | Insert new bid                                  |
+| `get_bids_for_rfp(rfp_id) -> list[dict]`                                   | All bids for an RFP                             |
+| `accept_bid(bid_id, rfp_id, session_id, transaction_id)`                   | Atomic: RFP→Locked, bid→Accepted, rest→Rejected |
 
 ### Database schema
 
 **`owner`** (id=1 always):
+
 - `locus_auth_token TEXT` — buyer Locus API key
 - `merchant_locus_token TEXT` — merchant Locus API key
 - `max_task_budget REAL`
 - `daily_limit REAL`
 
 **`agent_policies`** (id=1 always):
+
 - `required_assessor_score REAL DEFAULT 4.5`
 - `allowed_service_types TEXT` — JSON array
 
 **`rfps`**:
+
 - `id TEXT PRIMARY KEY` — UUID
 - `buyer_id TEXT`, `task_spec TEXT`, `max_budget REAL`, `currency TEXT DEFAULT 'USDC'`
 - `deadline_seconds INTEGER`, `min_reputation REAL`, `verification_type TEXT`
@@ -198,6 +207,7 @@ settle-conflict (Human owner via dashboard UI):
 - `created_at TIMESTAMP`
 
 **`bids`**:
+
 - `id TEXT PRIMARY KEY` — UUID
 - `rfp_id TEXT` — FK to rfps
 - `seller_id TEXT`, `seller_email TEXT`, `bid_amount REAL`, `eta_seconds INTEGER`
@@ -242,6 +252,7 @@ All agents communicate with the Hub exclusively via HTTP (`httpx`). They never i
 **State:** `AssessorState` — `base_url`, `locked_rfps`, `current_rfp`, `delivery_note`, `verdict_a`, `reasoning_a`, `verdict_b`, `reasoning_b`, `conflict`
 
 **Graph:**
+
 ```
 fetch_locked_rfps → pick_next →(no rfp → END)
                               ↓
@@ -255,14 +266,16 @@ fetch_locked_rfps → pick_next →(no rfp → END)
 ```
 
 **LLM Judges:**
+
 - **Judge A** `_call_groq(rfp, delivery_note)` — model `llama-3.3-70b-versatile`, Groq SDK
-- **Judge B** `_call_gemma(rfp, delivery_note)` — model `gemma2-9b-it`, same Groq SDK/key
+- **Judge B** `_call_gemma(rfp, delivery_note)` — model `llama-3.3-70b-versatile`, same Groq SDK/key
 
 Both return `(verdict: str, reasoning: str)`.
 
 **Delivery note**: `"Work completed as specified. Delivered: {task_spec} — all requirements met, tested, and ready for review."` — this phrasing consistently produces PASS verdicts in demo scenarios.
 
 **Env vars:**
+
 - `FORCE_VERDICT_A` — override Judge A result (`PASS`/`FAIL`)
 - `FORCE_VERDICT_B` — override Judge B result (`PASS`/`FAIL`)
 
@@ -277,6 +290,7 @@ Both return `(verdict: str, reasoning: str)`.
 ### `runner.py`
 
 Runs all three agents with `asyncio.gather()`. Invoke with:
+
 ```bash
 GROQ_API_KEY=gsk_... python -m backend.agents.runner
 ```
@@ -289,11 +303,11 @@ Both Assessor judges use the same `GROQ_API_KEY`. No separate key needed for Jud
 
 All templates extend `base.html`. Tailwind CSS loaded from CDN. Custom status colors from `/static/css/dashboard.css`.
 
-| Template | Key variables passed |
-|---|---|
-| `base.html` | Nav: Dashboard / Marketplace / Settings. Loads `locus-integration.js`. |
-| `dashboard.html` | `wallet_connected`, `owner`, `policy`, `active_pacts`, `demo_mode` |
-| `settings.html` | `owner`, `policy` — form pre-fills from DB values |
+| Template           | Key variables passed                                                    |
+| ------------------ | ----------------------------------------------------------------------- |
+| `base.html`        | Nav: Dashboard / Marketplace / Settings. Loads `locus-integration.js`.  |
+| `dashboard.html`   | `wallet_connected`, `owner`, `policy`, `active_pacts`, `demo_mode`      |
+| `settings.html`    | `owner`, `policy` — form pre-fills from DB values                       |
 | `marketplace.html` | `rfps_with_bids` — list of `{rfp: dict, bids: list[dict]}`, `demo_mode` |
 
 `marketplace.html` has `data-refresh="true"` on the outer `<div>` — `locus-integration.js` detects this and calls `location.reload()` every 10 seconds. Verifying/Locked RFPs show a "View Locus Checkout Session →" link if `rfp.checkout_url` is set.
@@ -309,6 +323,7 @@ Status badges use `badge-{status|lower}` CSS class (e.g. `badge-conflict`, `badg
 ## static/ — JS and CSS
 
 ### `js/locus-integration.js`
+
 - `showToast(message, type)` — bottom-right toast notification
 - `refreshBalance()` — fetches `/api/v1/balance`, updates `#balance-display` and `#wallet-address`
 - `submitMandate(event)` — form submit handler for `#mandate-form` in settings
@@ -316,6 +331,7 @@ Status badges use `badge-{status|lower}` CSS class (e.g. `badge-conflict`, `badg
 - Auto-wired on `DOMContentLoaded`: mandate form submit, 30s balance poll, 10s marketplace reload
 
 ### `css/dashboard.css`
+
 - CSS custom properties for all 6 escrow states (including `--color-escrow-conflict: #a855f7`)
 - `.badge-*` and `.status-*` classes for all 6 states
 - `.toast` + `.toast.show` animation classes

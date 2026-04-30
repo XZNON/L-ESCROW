@@ -10,21 +10,22 @@ Step 03 (Agent Squad) introduced a single Groq LLM judge in the Assessor Agent. 
 
 ## Files Changed
 
-| File | Change |
-|---|---|
-| `backend/database/db.py` | 5 new migrations; `conflict_rfp()`, `settle_conflict()`; updated `get_active_pacts()` |
-| `backend/app.py` | `POST /api/v1/report-conflict`, `POST /api/v1/settle-conflict`, `ConflictRequest`, `SettleRequest` models |
-| `backend/agents/assessor.py` | Full refactor — dual-judge jury with `reason_judges`, `consensus`, `report_conflict` nodes |
-| `backend/templates/dashboard.html` | Conflict badge, side-by-side reasoning panel, Settle buttons |
-| `backend/static/css/dashboard.css` | `--color-escrow-conflict`, `.badge-conflict`, `.status-conflict` |
-| `backend/agents/runner.py` | Updated docstring for env vars |
-| `requirements.txt` | No new dependencies (both judges use existing `groq` SDK) |
+| File                               | Change                                                                                                    |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `backend/database/db.py`           | 5 new migrations; `conflict_rfp()`, `settle_conflict()`; updated `get_active_pacts()`                     |
+| `backend/app.py`                   | `POST /api/v1/report-conflict`, `POST /api/v1/settle-conflict`, `ConflictRequest`, `SettleRequest` models |
+| `backend/agents/assessor.py`       | Full refactor — dual-judge jury with `reason_judges`, `consensus`, `report_conflict` nodes                |
+| `backend/templates/dashboard.html` | Conflict badge, side-by-side reasoning panel, Settle buttons                                              |
+| `backend/static/css/dashboard.css` | `--color-escrow-conflict`, `.badge-conflict`, `.status-conflict`                                          |
+| `backend/agents/runner.py`         | Updated docstring for env vars                                                                            |
+| `requirements.txt`                 | No new dependencies (both judges use existing `groq` SDK)                                                 |
 
 ---
 
 ## Step 1 — DB (`backend/database/db.py`)
 
 ### Migrations added
+
 ```python
 "ALTER TABLE rfps ADD COLUMN judge_a_verdict TEXT",
 "ALTER TABLE rfps ADD COLUMN judge_a_reasoning TEXT",
@@ -34,13 +35,17 @@ Step 03 (Agent Squad) introduced a single Groq LLM judge in the Assessor Agent. 
 ```
 
 ### New functions
+
 **`conflict_rfp(rfp_id, verdict_a, reasoning_a, verdict_b, reasoning_b)`**
+
 - Sets `status = 'Conflict'`, stores both verdicts/reasonings and a `conflict_notes` summary
 
 **`settle_conflict(rfp_id, assessor_id, verdict)`**
+
 - Delegates to existing `complete_rfp()` (PASS) or `dispute_rfp()` (FAIL)
 
 ### Updated `get_active_pacts()`
+
 - Added `'Conflict'` to status filter
 - Added `judge_a_verdict`, `judge_a_reasoning`, `judge_b_verdict`, `judge_b_reasoning` to SELECT
 
@@ -49,11 +54,13 @@ Step 03 (Agent Squad) introduced a single Groq LLM judge in the Assessor Agent. 
 ## Step 2 — API Routes (`backend/app.py`)
 
 ### `POST /api/v1/report-conflict`
+
 - Body: `ConflictRequest` (rfp_id, assessor_id, verdict_a, reasoning_a, verdict_b, reasoning_b)
 - Guards: 400 if verdicts invalid, 404 if RFP missing, 409 if RFP not `Locked`
 - Calls `db.conflict_rfp()` → returns `{"success": True, "status": "Conflict"}`
 
 ### `POST /api/v1/settle-conflict`
+
 - Body: `SettleRequest` (rfp_id, verdict)
 - Guards: 400 if verdict invalid, 404 if RFP missing, 409 if RFP not `Conflict`
 - Calls `db.settle_conflict()`, attempts Locus cancel on FAIL (same pattern as `/api/v1/verify`)
@@ -64,6 +71,7 @@ Step 03 (Agent Squad) introduced a single Groq LLM judge in the Assessor Agent. 
 ## Step 3 — Assessor Agent (`backend/agents/assessor.py`)
 
 ### New graph topology
+
 ```
 fetch_locked_rfps → pick_next →(no rfp → END)
                               ↓
@@ -77,10 +85,12 @@ fetch_locked_rfps → pick_next →(no rfp → END)
 ```
 
 ### Judges
+
 - **Judge A**: `llama-3.3-70b-versatile` via `_call_groq()`
-- **Judge B**: `gemma2-9b-it` via `_call_gemma()` — different model family, same Groq API key
+- **Judge B**: `llama-3.3-70b-versatile` via `_call_gemma()` — different model family, same Groq API key
 
 ### Concurrent fan-out in `reason_judges`
+
 ```python
 (va, ra), (vb, rb) = await asyncio.gather(
     _call_groq(rfp, delivery_note),
@@ -89,6 +99,7 @@ fetch_locked_rfps → pick_next →(no rfp → END)
 ```
 
 ### Env vars for testing
+
 - `FORCE_VERDICT_A=PASS FORCE_VERDICT_B=FAIL` → forces Conflict
 - `FORCE_VERDICT_A=FAIL FORCE_VERDICT_B=FAIL` → unanimous FAIL → auto Disputed
 
@@ -99,8 +110,12 @@ fetch_locked_rfps → pick_next →(no rfp → END)
 ```css
 --color-escrow-conflict: #a855f7;
 
-.badge-conflict  { background-color: var(--color-escrow-conflict); }
-.status-conflict { color: var(--color-escrow-conflict); }
+.badge-conflict {
+  background-color: var(--color-escrow-conflict);
+}
+.status-conflict {
+  color: var(--color-escrow-conflict);
+}
 ```
 
 ---
