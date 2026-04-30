@@ -74,6 +74,7 @@ def init_db() -> None:
             "ALTER TABLE rfps ADD COLUMN conflict_notes TEXT",
             "ALTER TABLE rfps ADD COLUMN issue_id TEXT",
             "ALTER TABLE rfps ADD COLUMN sandbox_file TEXT",
+            "ALTER TABLE rfps ADD COLUMN assigned_seller_id TEXT",
         ]:
             try:
                 conn.execute(migration)
@@ -221,9 +222,11 @@ def get_bids_for_rfp(rfp_id: str) -> list[dict]:
 def accept_bid(bid_id: str, rfp_id: str, session_id: str, transaction_id: str) -> None:
     """Atomically lock RFP, accept winning bid, reject all others."""
     with _connect() as conn:
+        bid = conn.execute("SELECT seller_id FROM bids WHERE id = ?", (bid_id,)).fetchone()
+        seller_id = bid["seller_id"] if bid else None
         conn.execute(
-            "UPDATE rfps SET status = 'Locked', escrow_session_id = ?, verifying_bid_id = NULL WHERE id = ?",
-            (session_id, rfp_id),
+            "UPDATE rfps SET status = 'Locked', escrow_session_id = ?, verifying_bid_id = NULL, assigned_seller_id = ? WHERE id = ?",
+            (session_id, seller_id, rfp_id),
         )
         conn.execute(
             "UPDATE bids SET status = 'Accepted', locus_transaction_id = ? WHERE id = ?",
@@ -301,6 +304,15 @@ def dispute_rfp(rfp_id: str, assessor_id: str, verdict: str) -> None:
                WHERE id = ?""",
             (assessor_id, verdict, rfp_id),
         )
+
+
+def get_locked_rfps_for_seller(seller_id: str) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM rfps WHERE status = 'Locked' AND assigned_seller_id = ?",
+            (seller_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 # ── Sandbox helpers ───────────────────────────────────────────────────────────
