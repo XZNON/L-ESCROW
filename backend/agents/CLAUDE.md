@@ -30,7 +30,7 @@ Three autonomous LangGraph agents that drive the L-ESCROW lifecycle end-to-end. 
 
 ## Notes
 
-- Judge B uses `gemma2-9b-it` (not llama) — both judges share the same Groq key
+- Both judges now use `llama-3.3-70b-versatile` — gemma2-9b-it was deprecated
 - Runner polls: Buyer 15s, Seller 8s, Assessor 5s
 - Without `DEMO_MODE=true` on server, bids won't lock (real Locus payment required)
 - Run server with `--reload-exclude "*/simulation_sandbox/*"` to prevent reload on PR file writes

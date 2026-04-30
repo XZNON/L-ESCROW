@@ -201,7 +201,7 @@ settle-conflict (Human owner via dashboard UI):
 - `verified_at TIMESTAMP` — when verdict was submitted
 - `judge_a_verdict TEXT` — **NEW** — Judge A (Llama 3.3) verdict
 - `judge_a_reasoning TEXT` — **NEW** — Judge A reasoning text
-- `judge_b_verdict TEXT` — **NEW** — Judge B (Gemma 2) verdict
+- `judge_b_verdict TEXT` — **NEW** — Judge B (Llama 3.3) verdict
 - `judge_b_reasoning TEXT` — **NEW** — Judge B reasoning text
 - `conflict_notes TEXT` — **NEW** — summary string for Conflict rows
 - `created_at TIMESTAMP`
@@ -312,7 +312,7 @@ All templates extend `base.html`. Tailwind CSS loaded from CDN. Custom status co
 
 `marketplace.html` has `data-refresh="true"` on the outer `<div>` — `locus-integration.js` detects this and calls `location.reload()` every 10 seconds. Verifying/Locked RFPs show a "View Locus Checkout Session →" link if `rfp.checkout_url` is set.
 
-`dashboard.html` Active Pacts table has 5 columns: Task / Seller / Amount / Status / Jury. Conflict rows have purple row tint + "View & Settle" toggle button. Hidden `<tr>` beneath each Conflict row shows Judge A (Llama 3.3) and Judge B (Gemma 2) verdicts + reasoning side-by-side, with "Release Funds (PASS)" and "Refund Buyer (FAIL)" buttons.
+`dashboard.html` Active Pacts table has 5 columns: Task / Seller / Amount / Status / Jury. Conflict rows have purple row tint + "View & Settle" toggle button. Hidden `<tr>` beneath each Conflict row shows Judge A (Llama 3.3) and Judge B (Llama 3.3) verdicts + reasoning side-by-side, with "Release Funds (PASS)" and "Refund Buyer (FAIL)" buttons.
 
 `dashboard.html` also renders a Demo Mode amber badge and "Run Demo Cycle" button when `demo_mode=True`. Clicking the button calls `POST /api/v1/demo/run` and opens the Locus checkout URL in a new tab.
 

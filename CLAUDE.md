@@ -26,7 +26,7 @@ All feature branches have been merged to `main` and deleted.
 - **Backend**: FastAPI (Python) — `backend/app.py` is the single app entry point
 - **AI Agents**: LangGraph — three autonomous agents (Buyer, Seller, Assessor) in `backend/agents/`
 - **LLM (Judge A)**: Groq `llama-3.3-70b-versatile` — first Assessor judge
-- **LLM (Judge B)**: Groq `llama-3.3-70b-versatile` — second Assessor judge (same Groq API key, different model)
+- **LLM (Judge B)**: Groq `llama-3.3-70b-versatile` — second Assessor judge (same Groq API key, same model — gemma2-9b-it deprecated)
 - **Payments**: Locus SDK — REST API at `https://beta-api.paywithlocus.com/api`, auth via `Bearer claw_…` key
 - **Database**: SQLite (`lescrow.db`, no ORM) for MVP
 - **HTTP client**: `httpx` (async) for all outbound Locus API calls and agent-to-hub calls
